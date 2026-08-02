@@ -65,7 +65,40 @@ benchmark harness. kofun-boot's serve lane builds on it rather than beside it.
 | `tests/boot/check.sh` | the gate: contract stops at its boundary, seed agrees on both backends, bytes do not move under a hostile environment |
 | `docs/DESIGN.md` | the architecture and every decision's reason |
 | `docs/ROADMAP.md` | lanes → epics → issues; how this grows to production |
+| `docs/BACKLOG.md` | the epic decomposition, the issue shape, and the labels |
+| `docs/research/` | the surveys the decisions came out of, each source-linked and stamped |
+| `docs/architecture/` | the decisions themselves: effects, the update loop, domain modelling |
 | `vendor/kofun` | the pinned language checkout |
+
+## The three decisions worth arguing with
+
+The research dossiers in [`docs/research/`](docs/research/) produced three
+positions that shape everything else. Each links to the evidence.
+
+**Effects are inert data, not a monad.**
+[`docs/architecture/EFFECTS.md`](docs/architecture/EFFECTS.md) — the core
+returns a `Cmd` describing what should happen; the shell interprets it holding
+the capabilities. This needs a closed sum and a function, which is all Kofun
+has today, and it is *why Elm is understandable* — the monad was never the
+clear part. A recorded run then **is** the `Cmd`/`Msg` sequence, so replay
+needs no instrumentation.
+
+**One update loop, three shells.**
+[`docs/architecture/TEA.md`](docs/architecture/TEA.md) — `init`, `update`,
+`view`, `subscriptions`, all pure, interpreted by a server shell, a desktop
+shell, or a server-driven shell. That the same core runs under all of them is
+a gate, not a slogan.
+
+**The view is an ADT, which is the only reason "replace the webview" is
+schedulable.**
+[`docs/research/RENDER_BACKENDS.md`](docs/research/RENDER_BACKENDS.md) — Tauri
+cannot swap its renderer cheaply because its contract *is* the DOM, so a
+replacement must reimplement the web platform; that is why the leading attempt
+is still pre-alpha. If the view is a vocabulary we chose, a renderer is an
+interpreter, and native becomes a second backend rather than a rewrite. The
+same dossier records the finding that governs the desktop lane: **IME and
+accessibility are gates, not features** — a 2025 survey found 94.4% of Rust
+GUI libraries not production-ready, with text input the most common failure.
 
 ## Building
 

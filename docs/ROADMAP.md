@@ -23,15 +23,29 @@ have to break.
 | L8 | cli & dx | `boot new/dev/test/bench/openapi/gen`; scaffolds that compile with the core/shell split; watch-reload | — |
 | L9 | desktop | webview shell (KB-scale, gated size); wasm32 guest via host ABI v1; typed IPC = the router contract | kofun #906 activation lanes |
 | L10 | site & docs | tutorial that never lies (every snippet is a gated fixture); comparison pages that show their measurement | — |
+| L11 | effects & TEA | `Cmd`/`Sub` as inert data; the interpreter surface; `Result` and railway combinators; the TEA runtime; one core under every shell; effect-row migration | effect rows (kofun type-system target) for L11's final epic only |
+| L12 | domain kit | constrained types and smart constructors; deriver/outcome discipline; the outcome lint; bounded-context layout; outbox; secret types | visibility slice maturity for constructor privacy |
+
+L11 and L12 come from the research dossiers in
+[`docs/research/`](research/) and the decisions in
+[`docs/architecture/`](architecture/). They are the identity lanes: L11 is
+*how an application asks for something to happen*, and L12 is *how it says
+what it means*. Everything else in this table is a way of running them.
 
 ## Sequencing
 
 ```
 now ──► L1 contract + L3 capabilities + L4 replay      (pure, unblocked, the identity of the framework)
+     ──► L11 Cmd/Sub + TEA runtime                       (pure data and one interpreter; unblocked)
      ──► L2 serve v1 + L5 first baselines               (framework/http exists; numbers start accruing)
-     ──► L8 cli                                          (once `boot new` output compiles under the gate)
+     ──► L12 domain kit + L8 cli                         (once `boot new` output compiles under the gate)
 later ─► L6, L7, L9 as their language capabilities land
 ```
+
+L11 sits beside L1 rather than after it because the two meet: an endpoint
+value is what a request means, and a `Cmd` is what a handler asks for. Getting
+them wrong in different shapes is how frameworks end up with two dependency
+stories.
 
 ## The bars, restated as numbers to be filled in
 
