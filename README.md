@@ -20,7 +20,7 @@ Everything below follows from that sentence.
 ```sh
 git clone --recurse-submodules https://github.com/hjosugi/kofun-boot
 cd kofun-boot
-sh scripts/dev.sh                      # 22 unit tests, a build, a golden check — about a second
+sh scripts/dev.sh                      # 31 unit tests, a build, a golden check — about a second
 sh scripts/new.sh ../my-app --name my-app   # a project that already has the boundary
 cd ../my-app && sh tests/check.sh      # its own gate: boundary, suite, golden, determinism
 ```
@@ -98,6 +98,24 @@ shell, or tests fails with the offending source path and line.
 `orders` module without editing `router` or `mock`, then injects an import of
 `router/core` and requires the gate to reject the exact line.
 
+### Effects — the core asks by returning data
+
+`modules/effects/` owns the canonical `Cmd` / `Sub` / `Msg` contract and its
+bounded Stage 2 projection. Every effecting constructor carries the `MsgId` of
+its continuation; HTTP success and timeout return different `Message`
+values carrying that same id. Command and subscription interpreters receive
+different capability records, so neither signature claims dependencies it
+cannot use. `Custom` keeps both command and
+subscription families extensible, while unscoped spawn stays absent until the
+language can own its lifetime.
+
+The executable trace covers an empty command, a batch, HTTP completion,
+timeout, clock, persistence, custom command, tick, signal, and custom
+subscription. Ten named assertions read all 60 lines.
+Reference and C11 backends emit identical bytes twice, under a hostile time
+zone and locale, and under `env -i`; emitted C is checked for ambient clock,
+environment, file, and socket reach.
+
 ### Replay — a recorded session, run again
 
 There was no trace format to design. `apply` already returns the resource and
@@ -144,13 +162,13 @@ compiles.
 
 ## Testing, which is most of the reason to pick a framework
 
-**Unit tests need no server.** kotest pairs `core_test.kofun` with its
-companion `core.kofun`, so tests call the core directly. Twenty-two of them run
+**Unit tests need no server.** kotest pairs module-owned tests with their
+core, so tests call the core directly. Thirty-one of them run
 in about a second. Assertions accumulate rather than abort, so a broken change
 reports everything that is wrong at once instead of the first thing.
 
 ```
-Tests  22 passed (22 total, 2 suites)
+Tests  31 passed (31 total, 3 suites)
 ```
 
 **Integration tests use a real socket.** `tests/integration/serve.sh` builds the
@@ -189,6 +207,7 @@ number quoted; hand-editing the OpenAPI document fails with the diff.
 |---|---|
 | `modules/router/` | router bounded context: canonical contract, core, shell, unit suite, golden |
 | `modules/mock/` | mock bounded context: canonical contract, core, shell, unit suite |
+| `modules/effects/` | Cmd/Sub/Msg boundary: canonical contract, Stage 2 projection, shell trace, unit suite |
 | `contracts/` | generated/projected public artifacts: OpenAPI, typed client, replay trace |
 | `scripts/` | developer loop, module gate/test adapter, build and projection commands |
 | `tests/architecture/` | data-driven module ownership and contract-only dependency gate, tested both ways |

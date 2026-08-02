@@ -1,0 +1,84 @@
+# The canonical effect contract.
+#
+# This file states the surface the framework intends, not what the current
+# executable slice can already lower. List, Bytes, nested values in records,
+# and constructors with several payloads are deliberately ahead of Stage 2.
+# tests/boot/check.sh pins that boundary to the same parser diagnostic as
+# the router contract; the executable projection lives in ../core/effects.kofun.
+#
+# Four rules are contractual:
+#
+# 1. Every effecting Cmd carries the MsgId of its continuation. A request and
+#    its answer cannot lose correlation in a port or callback convention.
+# 2. Custom keeps Cmd and Sub open to application-defined interpreters.
+# 3. The interpreter owns the deadline and returns a Message for success,
+#    expected failure, and timeout. Foreign code cannot simply never call back.
+# 4. Expected effect failure is a Msg carrying what was observed. Result.Err
+#    is reserved for the interpreter itself being unable to honour its contract.
+
+let EFFECTS_CONTRACT_VERSION = 1
+
+type Cmd =
+    | None
+    | Batch(commands: List[Cmd])
+    | HttpRequest(request: OutboundRequest, on_result: MsgId)
+    | ReadClock(on_result: MsgId)
+    | Persist(entity: EntityId, bytes: Bytes, on_result: MsgId)
+    | Custom(tag: CmdTag, payload: Bytes, on_result: MsgId)
+
+type Sub =
+    | NoSub
+    | Every(interval_ms: Int, on_tick: MsgId)
+    | OnSignal(signal: SignalId, on_signal: MsgId)
+    | Custom(tag: SubTag, payload: Bytes, on_event: MsgId)
+
+type Msg =
+    | HttpCompleted(status: Int, body: Bytes)
+    | HttpTimedOut(deadline_ms: Int)
+    | ClockRead(observed_ms: Int)
+    | Persisted(entity: EntityId)
+    | PersistFailed(entity: EntityId, reason: Int)
+    | CustomCompleted(tag: CmdTag, payload: Bytes)
+    | Tick(interval_ms: Int, observed_ms: Int)
+    | SignalReceived(signal: SignalId)
+    | CustomEvent(tag: SubTag, payload: Bytes)
+
+type Message = {
+    continuation: MsgId,
+    value: Msg,
+}
+
+type Deadline = {
+    after_ms: Int,
+}
+
+type CmdCapabilities = {
+    clock: MonotonicClock,
+    http: HttpClient,
+    persistence: Persistence,
+    custom: CustomEffectInterpreter,
+}
+
+type SubCapabilities = {
+    clock: MonotonicClock,
+    signals: SignalSource,
+    custom: CustomEffectInterpreter,
+}
+
+# Total for every accepted command. Effecting constructors produce at least
+# one Message, including timeout and expected failure. None and an empty Batch
+# produce an empty list because they request no effect.
+fn boot_interpret(
+    command: Cmd,
+    deadline: Deadline,
+    capabilities: CmdCapabilities
+) -> Result[List[Message], InterpreterFailure] {
+    ...
+}
+
+fn boot_subscribe(
+    subscription: Sub,
+    capabilities: SubCapabilities
+) -> Result[List[Message], InterpreterFailure] {
+    ...
+}

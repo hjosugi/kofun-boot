@@ -3,7 +3,7 @@ set -eu
 
 # The kofun-boot gate.
 #
-# Three things are checked, in this order:
+# Four things are checked, in this order:
 #
 #   1. the router-owned canonical surface still declares the framework
 #      contract, and still stops at the documented compiler boundary rather
@@ -14,6 +14,8 @@ set -eu
 #   3. nothing in the seed reaches ambient state — asserted against the code
 #      with comments stripped, and demonstrated by re-running under a hostile
 #      environment and comparing bytes.
+#   4. the effects module preserves continuation ids and turns success,
+#      timeout and subscription delivery into a deterministic Cmd/Msg trace.
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 KOFUN="$ROOT/vendor/kofun/bin/kofun"
@@ -216,6 +218,235 @@ test "$lines" -eq 53 ||
 # are distinct rather than trusting the comment that says so.
 dupes=$(sed -n '1,12p' "$expected" | paste - - - | awk '{print $1, $2}' | sort | uniq -d)
 test -z "$dupes" || fail "duplicate (method, path) pair in the table: $dupes"
+
+# ------------------------------------------------------- the effect boundary
+#
+# ADR 6 moved canonical surfaces beside their bounded contexts.  The effect
+# contract is therefore owned by modules/effects rather than duplicated under
+# a global contracts/ directory.  It remains ahead of the compiler in its
+# honest List/Bytes/multi-payload shape, while the core/shell projection below
+# is executable in the Stage 2 slice.
+
+effects_module=${EFFECTS_MODULE:-"$ROOT/modules/effects"}
+effects_contract="$effects_module/contract/effects.kofun"
+effects_core="$effects_module/core/effects.kofun"
+effects_shell="$effects_module/shell/effects.kofun"
+effects_expected="$effects_module/tests/effects.stdout"
+test -f "$effects_contract" || fail 'effects canonical contract is missing'
+test -f "$effects_core" || fail 'effects core is missing'
+test -f "$effects_shell" || fail 'effects shell is missing'
+test -f "$effects_expected" || fail 'effects trace golden is missing'
+
+for declaration in \
+    'type Cmd =' \
+    'type Sub =' \
+    'type Msg =' \
+    'type Message = {' \
+    'type Deadline = {' \
+    'type CmdCapabilities = {' \
+    'type SubCapabilities = {' \
+    'fn boot_interpret(' \
+    'fn boot_subscribe('
+do
+    require_line 'effects canonical surface lost a declaration' \
+        "$declaration" "$effects_contract"
+done
+
+require_line 'command interpretation gained an undeclared capability bundle' \
+    'capabilities: CmdCapabilities' "$effects_contract"
+require_line 'subscription interpretation gained an undeclared capability bundle' \
+    'capabilities: SubCapabilities' "$effects_contract"
+
+# Custom keeps both request families extensible. Check it before the generic
+# continuation loop so removing one fails as an openness violation rather
+# than as an incidental field mismatch.
+require_line 'Cmd lost its Custom openness constructor' \
+    '| Custom(tag: CmdTag, payload: Bytes, on_result: MsgId)' \
+    "$effects_contract"
+require_line 'Sub lost its Custom openness constructor' \
+    '| Custom(tag: SubTag, payload: Bytes, on_event: MsgId)' \
+    "$effects_contract"
+custom_count=$(grep -Fc '    | Custom(' "$effects_contract")
+test "$custom_count" -eq 2 ||
+    fail "effects openness moved: expected Custom in Cmd and Sub, found $custom_count"
+
+# Correlation is inside every effecting constructor, not an application
+# convention. Each failure names the constructor whose continuation moved.
+for continuation in \
+    '| HttpRequest(request: OutboundRequest, on_result: MsgId)' \
+    '| ReadClock(on_result: MsgId)' \
+    '| Persist(entity: EntityId, bytes: Bytes, on_result: MsgId)' \
+    '| Every(interval_ms: Int, on_tick: MsgId)' \
+    '| OnSignal(signal: SignalId, on_signal: MsgId)'
+do
+    require_line 'an effect constructor lost its continuation' \
+        "$continuation" "$effects_contract"
+done
+
+if "$KOFUN" check "$effects_contract" \
+    >"$WORK/effects.contract.stdout" 2>"$WORK/effects.contract.stderr"
+then
+    fail 'effects canonical surface unexpectedly claimed executable codegen'
+fi
+require_line 'effects canonical surface did not stop at the documented boundary' \
+    'error[E2S02]: expected top-level `fn` or `type`' \
+    "$WORK/effects.contract.stderr"
+
+# The executable projection carries the same extension and continuation
+# properties. Pinning the rich contract alone would let the seed silently
+# narrow it while the prose stayed correct.
+for projection in \
+    '| HttpRequest(on_result: Int)' \
+    '| ReadClock(on_result: Int)' \
+    '| Persist(on_result: Int)' \
+    '| CustomCmd(on_result: Int)' \
+    '| Every(on_tick: Int)' \
+    '| OnSignal(on_signal: Int)' \
+    '| CustomSub(on_event: Int)'
+do
+    require_line 'effects Stage 2 projection lost a contract property' \
+        "$projection" "$effects_core"
+done
+
+effects_seed="$WORK/effects.unit.kofun"
+cat "$effects_core" >"$effects_seed"
+printf '\n' >>"$effects_seed"
+cat "$effects_shell" >>"$effects_seed"
+sed 's/[[:space:]]*#.*$//' "$effects_seed" >"$WORK/effects.code"
+if grep -qE 'clock_gettime|gettimeofday|getenv|fopen|socket\(|__linux_syscall|import ' \
+    "$WORK/effects.code"
+then
+    fail 'the effects seed names ambient state'
+fi
+
+"$KOFUN" check "$effects_seed" \
+    >"$WORK/effects.check.stdout" 2>"$WORK/effects.check.stderr" ||
+    fail "effects seed did not check: $(cat "$WORK/effects.check.stderr")"
+"$KOFUN" build "$effects_seed" -o "$WORK/effects" \
+    --emit-c "$WORK/effects.c" \
+    >"$WORK/effects.build.stdout" 2>"$WORK/effects.build.stderr" ||
+    fail "effects seed did not build: $(cat "$WORK/effects.build.stderr")"
+
+"$WORK/effects" >"$WORK/effects.backend.stdout"
+"$KOFUN" run "$effects_seed" \
+    >"$WORK/effects.reference.stdout" 2>"$WORK/effects.run.stderr" ||
+    fail "effects seed did not run on the reference executor: $(cat "$WORK/effects.run.stderr")"
+cmp "$WORK/effects.backend.stdout" "$WORK/effects.reference.stdout" ||
+    fail 'effects reference executor and C11 backend disagree'
+
+"$WORK/effects" >"$WORK/effects.second.stdout"
+cmp "$WORK/effects.backend.stdout" "$WORK/effects.second.stdout" ||
+    fail 'two executions of the effects seed differ'
+TZ=Pacific/Kiritimati LC_ALL=C LANG=C \
+    "$WORK/effects" >"$WORK/effects.hostile.stdout"
+cmp "$WORK/effects.backend.stdout" "$WORK/effects.hostile.stdout" ||
+    fail 'effects output changed under hostile TZ or locale'
+env -i "$WORK/effects" >"$WORK/effects.bare.stdout"
+cmp "$WORK/effects.backend.stdout" "$WORK/effects.bare.stdout" ||
+    fail 'effects output changed with an empty environment'
+if grep -qE 'time\.h|clock_gettime|gettimeofday|localtime|getenv|fopen|socket' \
+    "$WORK/effects.c"
+then
+    fail 'the emitted effects C reaches for ambient state'
+fi
+
+effect_field() {
+    sed -n "$1,$2p" "$WORK/effects.backend.stdout" | tr '\n' ' '
+}
+
+assert_effect_field() {
+    label=$1
+    from=$2
+    to=$3
+    want=$4
+    got=$(effect_field "$from" "$to")
+    test "$got" = "$want" ||
+        fail "$label: expected '$want', got '$got'"
+}
+
+# Six lines per step: Cmd/Sub source, effect kind, argument, continuation,
+# message kind, observed answer. Every line is owned by one named assertion.
+assert_effect_field 'an empty Cmd produces the named empty answer' \
+    1 6 '1 0 0 0 0 0 '
+assert_effect_field 'a Batch carries its deterministic command count' \
+    7 12 '1 1 2 0 0 0 '
+assert_effect_field 'an HTTP result carries its continuation' \
+    13 18 '1 2 9001 41 1 200 '
+assert_effect_field 'an HTTP timeout is a Msg carrying its continuation' \
+    19 24 '1 2 9002 42 2 1000 '
+assert_effect_field 'a subscription tick carries its continuation' \
+    25 30 '2 1 5000 51 6 1700000000 '
+assert_effect_field 'a clock answer separates continuation and observation' \
+    31 36 '1 3 0 43 3 1700000001 '
+assert_effect_field 'a persistence answer carries entity and continuation' \
+    37 42 '1 4 7001 44 4 7001 '
+assert_effect_field 'a custom command remains executable and correlated' \
+    43 48 '1 5 8001 45 5 8001 '
+assert_effect_field 'a signal subscription remains executable and correlated' \
+    49 54 '2 2 9 52 7 9 '
+assert_effect_field 'a custom subscription remains executable and correlated' \
+    55 60 '2 3 8002 53 8 8002 '
+
+effects_lines=$(wc -l <"$WORK/effects.backend.stdout" | tr -d ' ')
+test "$effects_lines" -eq 60 ||
+    fail "named effects decisions cover 60 lines, got $effects_lines"
+cmp "$effects_expected" "$WORK/effects.backend.stdout" ||
+    fail 'named decisions passed but the recorded Cmd/Msg trace still differs'
+
+printf 'boot: Cmd/Sub continuations and total Msg answers are pinned: PASS\n'
+printf 'boot: effects agree on both backends under hostile TZ, locale, env -i: PASS\n'
+
+# Do not merely say these checks are structural: break each property in an
+# isolated module copy and require this same gate to reject it by name. The
+# recursive runs skip this block, so a mutation can never pass by recursing.
+if test "${EFFECTS_SKIP_BREAK_TEST:-0}" != 1; then
+    effects_breaks="$WORK/effects-breaks"
+    mkdir -p "$effects_breaks"
+
+    cp -R "$effects_module" "$effects_breaks/continuation"
+    sed -i \
+        's/HttpRequest(request: OutboundRequest, on_result: MsgId)/HttpRequest(request: OutboundRequest)/' \
+        "$effects_breaks/continuation/contract/effects.kofun"
+    if EFFECTS_MODULE="$effects_breaks/continuation" \
+        EFFECTS_SKIP_BREAK_TEST=1 sh "$0" \
+        >"$WORK/effects.break-continuation.log" 2>&1
+    then
+        fail 'dropping an effect continuation did not break the gate'
+    fi
+    require_line 'the continuation break was not rejected by name' \
+        'an effect constructor lost its continuation' \
+        "$WORK/effects.break-continuation.log"
+
+    cp -R "$effects_module" "$effects_breaks/openness"
+    sed -i '/CmdTag, payload: Bytes, on_result: MsgId/d' \
+        "$effects_breaks/openness/contract/effects.kofun"
+    if EFFECTS_MODULE="$effects_breaks/openness" \
+        EFFECTS_SKIP_BREAK_TEST=1 sh "$0" \
+        >"$WORK/effects.break-openness.log" 2>&1
+    then
+        fail 'removing Cmd.Custom did not break the gate'
+    fi
+    require_line 'the openness break was not rejected by name' \
+        'Cmd lost its Custom openness constructor' \
+        "$WORK/effects.break-openness.log"
+
+    cp -R "$effects_module" "$effects_breaks/timeout"
+    sed -i \
+        's/return step_cmd(command, request_code, HttpTimedOut(deadline_ms))/let timeout: Msg = NoMessage\
+        return step_cmd(command, request_code, timeout)/' \
+        "$effects_breaks/timeout/core/effects.kofun"
+    if EFFECTS_MODULE="$effects_breaks/timeout" \
+        EFFECTS_SKIP_BREAK_TEST=1 sh "$0" \
+        >"$WORK/effects.break-timeout.log" 2>&1
+    then
+        fail 'making timeout produce no Msg did not break the gate'
+    fi
+    require_line 'the timeout totality break was not rejected by name' \
+        'an HTTP timeout is a Msg carrying its continuation' \
+        "$WORK/effects.break-timeout.log"
+
+    printf 'boot: continuation, openness, and timeout-totality break tests fail by name: PASS\n'
+fi
 
 # The mock resource's core lives under the same rule: it may receive a store
 # and an operation, and may not construct a capability or own an entry point.

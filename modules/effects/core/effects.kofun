@@ -1,0 +1,241 @@
+# Bounded Stage 2 projection of the canonical Cmd/Sub/Msg contract.
+#
+# The canonical contract uses List, Bytes and multi-payload constructors. This
+# executable slice keeps the same decisions with integer codes, one payload
+# per constructor, and an EffectStep record beside the sums. For an effecting
+# Cmd/Sub, that payload is always its continuation MsgId. The record carries
+# the request argument and observed answer, so correlation never becomes an
+# out-of-band convention.
+#
+# There is no runtime here. These are inert values and pure interpreters over
+# explicit observations supplied by the caller. The shell chooses the five
+# observations in the recorded trace and owns every print.
+
+# ------------------------------------------------------------- codes
+
+fn source_cmd() -> Int { return 1 }
+fn source_sub() -> Int { return 2 }
+
+fn cmd_none() -> Int { return 0 }
+fn cmd_batch() -> Int { return 1 }
+fn cmd_http_request() -> Int { return 2 }
+fn cmd_read_clock() -> Int { return 3 }
+fn cmd_persist() -> Int { return 4 }
+fn cmd_custom() -> Int { return 5 }
+
+fn sub_none() -> Int { return 0 }
+fn sub_every() -> Int { return 1 }
+fn sub_signal() -> Int { return 2 }
+fn sub_custom() -> Int { return 3 }
+
+fn msg_none() -> Int { return 0 }
+fn msg_http_completed() -> Int { return 1 }
+fn msg_http_timed_out() -> Int { return 2 }
+fn msg_clock_read() -> Int { return 3 }
+fn msg_persisted() -> Int { return 4 }
+fn msg_custom_completed() -> Int { return 5 }
+fn msg_tick() -> Int { return 6 }
+fn msg_signal_received() -> Int { return 7 }
+fn msg_custom_event() -> Int { return 8 }
+
+# -------------------------------------------------------------- sums
+
+# Every effecting constructor carries its continuation. Batch carries its
+# bounded count; None requests no effect and has no continuation.
+type Cmd =
+    | NoCmd
+    | Batch(count: Int)
+    | HttpRequest(on_result: Int)
+    | ReadClock(on_result: Int)
+    | Persist(on_result: Int)
+    | CustomCmd(on_result: Int)
+
+type Sub =
+    | NoSub
+    | Every(on_tick: Int)
+    | OnSignal(on_signal: Int)
+    | CustomSub(on_event: Int)
+
+# A closed answer. Each case carries the observation the core must handle.
+type Msg =
+    | NoMessage
+    | HttpCompleted(status: Int)
+    | HttpTimedOut(deadline_ms: Int)
+    | ClockRead(observed_ms: Int)
+    | Persisted(entity: Int)
+    | CustomCompleted(tag: Int)
+    | Tick(observed_ms: Int)
+    | SignalReceived(signal: Int)
+    | CustomEvent(tag: Int)
+
+# One row of the trace. Six integers are enough to say which vocabulary the
+# request came from, its constructor and argument, its continuation, and the
+# answer constructor plus observed payload.
+type EffectStep = {
+    source: Int,
+    effect: Int,
+    argument: Int,
+    continuation: Int,
+    message: Int,
+    observed: Int,
+}
+
+# --------------------------------------------------------- accessors
+
+fn cmd_kind(command: Cmd) -> Int {
+    let mut kind = 0
+    match command {
+        NoCmd => { kind = cmd_none() },
+        Batch(_) => { kind = cmd_batch() },
+        HttpRequest(_) => { kind = cmd_http_request() },
+        ReadClock(_) => { kind = cmd_read_clock() },
+        Persist(_) => { kind = cmd_persist() },
+        CustomCmd(_) => { kind = cmd_custom() },
+    }
+    return kind
+}
+
+fn cmd_continuation(command: Cmd) -> Int {
+    let mut continuation = 0
+    match command {
+        NoCmd => { continuation = 0 },
+        Batch(_) => { continuation = 0 },
+        HttpRequest(on_result) => { continuation = on_result },
+        ReadClock(on_result) => { continuation = on_result },
+        Persist(on_result) => { continuation = on_result },
+        CustomCmd(on_result) => { continuation = on_result },
+    }
+    return continuation
+}
+
+fn sub_kind(subscription: Sub) -> Int {
+    let mut kind = 0
+    match subscription {
+        NoSub => { kind = sub_none() },
+        Every(_) => { kind = sub_every() },
+        OnSignal(_) => { kind = sub_signal() },
+        CustomSub(_) => { kind = sub_custom() },
+    }
+    return kind
+}
+
+fn sub_continuation(subscription: Sub) -> Int {
+    let mut continuation = 0
+    match subscription {
+        NoSub => { continuation = 0 },
+        Every(on_tick) => { continuation = on_tick },
+        OnSignal(on_signal) => { continuation = on_signal },
+        CustomSub(on_event) => { continuation = on_event },
+    }
+    return continuation
+}
+
+fn message_kind(message: Msg) -> Int {
+    let mut kind = 0
+    match message {
+        NoMessage => { kind = msg_none() },
+        HttpCompleted(_) => { kind = msg_http_completed() },
+        HttpTimedOut(_) => { kind = msg_http_timed_out() },
+        ClockRead(_) => { kind = msg_clock_read() },
+        Persisted(_) => { kind = msg_persisted() },
+        CustomCompleted(_) => { kind = msg_custom_completed() },
+        Tick(_) => { kind = msg_tick() },
+        SignalReceived(_) => { kind = msg_signal_received() },
+        CustomEvent(_) => { kind = msg_custom_event() },
+    }
+    return kind
+}
+
+fn message_observed(message: Msg) -> Int {
+    let mut observed = 0
+    match message {
+        NoMessage => { observed = 0 },
+        HttpCompleted(status) => { observed = status },
+        HttpTimedOut(deadline_ms) => { observed = deadline_ms },
+        ClockRead(observed_ms) => { observed = observed_ms },
+        Persisted(entity) => { observed = entity },
+        CustomCompleted(tag) => { observed = tag },
+        Tick(observed_ms) => { observed = observed_ms },
+        SignalReceived(signal) => { observed = signal },
+        CustomEvent(tag) => { observed = tag },
+    }
+    return observed
+}
+
+# ------------------------------------------------------- pure steps
+
+fn step_cmd(command: Cmd, argument: Int, message: Msg) -> EffectStep {
+    let step: EffectStep = EffectStep(
+        source: source_cmd(),
+        effect: cmd_kind(command),
+        argument: argument,
+        continuation: cmd_continuation(command),
+        message: message_kind(message),
+        observed: message_observed(message)
+    )
+    return step
+}
+
+fn step_sub(subscription: Sub, argument: Int, message: Msg) -> EffectStep {
+    let step: EffectStep = EffectStep(
+        source: source_sub(),
+        effect: sub_kind(subscription),
+        argument: argument,
+        continuation: sub_continuation(subscription),
+        message: message_kind(message),
+        observed: message_observed(message)
+    )
+    return step
+}
+
+fn trace_none() -> EffectStep {
+    let command: Cmd = NoCmd
+    let message: Msg = NoMessage
+    return step_cmd(command, 0, message)
+}
+
+fn trace_batch(count: Int) -> EffectStep {
+    let command: Cmd = Batch(count)
+    let message: Msg = NoMessage
+    return step_cmd(command, count, message)
+}
+
+# The deadline and observed delay are values. No clock is read here. Both
+# branches return a Msg and preserve the same continuation.
+fn interpret_http(
+    request_code: Int,
+    on_result: Int,
+    deadline_ms: Int,
+    observed_delay_ms: Int,
+    observed_status: Int
+) -> EffectStep {
+    let command: Cmd = HttpRequest(on_result)
+    if observed_delay_ms > deadline_ms {
+        return step_cmd(command, request_code, HttpTimedOut(deadline_ms))
+    }
+    return step_cmd(command, request_code, HttpCompleted(observed_status))
+}
+
+fn trace_clock(on_result: Int, observed_ms: Int) -> EffectStep {
+    return step_cmd(ReadClock(on_result), 0, ClockRead(observed_ms))
+}
+
+fn trace_persist(on_result: Int, entity: Int) -> EffectStep {
+    return step_cmd(Persist(on_result), entity, Persisted(entity))
+}
+
+fn trace_custom_cmd(on_result: Int, tag: Int) -> EffectStep {
+    return step_cmd(CustomCmd(on_result), tag, CustomCompleted(tag))
+}
+
+fn trace_tick(on_tick: Int, interval_ms: Int, observed_ms: Int) -> EffectStep {
+    return step_sub(Every(on_tick), interval_ms, Tick(observed_ms))
+}
+
+fn trace_signal(on_signal: Int, signal: Int) -> EffectStep {
+    return step_sub(OnSignal(on_signal), signal, SignalReceived(signal))
+}
+
+fn trace_custom_sub(on_event: Int, tag: Int) -> EffectStep {
+    return step_sub(CustomSub(on_event), tag, CustomEvent(tag))
+}

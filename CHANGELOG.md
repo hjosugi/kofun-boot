@@ -13,6 +13,53 @@ the `Unmeasured at this release` section added as a local requirement.
 
 Nothing yet.
 
+## [0.3.0] - 2026-08-02
+
+The effect boundary is now an executable bounded context rather than a design
+document alone. This is a contract addition below 1.0.0; it does not add a
+runtime, scheduler, live network interpreter, or unscoped spawn.
+
+### Added
+
+- **Canonical effect contract** — `modules/effects/contract/effects.kofun`
+  declares `Cmd`, `Sub`, `Msg`, and total interpreter surfaces. Every effecting
+  constructor carries its continuation, failure and timeout are messages, and
+  `Custom` is retained for both command and subscription extension. Command
+  and subscription interpreters have separate capability records, so their
+  signatures state only dependencies their respective sums can use.
+- **Stage 2 projection** — the executable core keeps the same decisions in the
+  current one-`Int`-payload slice; the shell emits a 60-line Cmd/Msg trace for
+  every effecting command and subscription constructor, plus empty and batch,
+  including HTTP timeout.
+- **Third bounded context** — `effects` owns contract, core, shell, tests, and
+  golden evidence under the module layout established in 0.2.0.
+
+### Gates
+
+- 31/31 module-owned tests pass across three suites.
+- The rich effect contract remains pinned at its documented compiler boundary.
+- The gate names a missing continuation, lost `Custom` openness, and a timeout
+  path that fails to return the required message; all three destructive checks
+  were observed to fail before publication.
+- Reference and C11 backends agree byte-for-byte across two runs, hostile time
+  zone and locale, and `env -i`; emitted C has no ambient clock, environment,
+  file, or socket reach.
+
+### Unmeasured at this release
+
+- Speed — L5; the benchmark harness exists and refuses to produce a number it
+  does not trust, but no baseline has been recorded.
+- Desktop lighter than Tauri — L9; blocked on the language's wasm32 activation
+  lanes, and gated behind IME and accessibility conformance before any number
+  is recorded ([#29](https://github.com/hjosugi/kofun-boot/issues/29)).
+
+### Known boundaries
+
+- The rich contract uses `List`, `Bytes`, and multi-payload constructors ahead
+  of the compiler; the executable projection uses fixed-rank integer values.
+- No live interpreter, TEA loop, scheduler, trace serialisation, or scoped
+  spawn is claimed by this release. Trace v1 remains [#32](https://github.com/hjosugi/kofun-boot/issues/32).
+
 ## [0.2.0] - 2026-08-02
 
 Bounded contexts now own their complete vertical. This is a breaking path
@@ -157,6 +204,7 @@ is blocked on the lane named beside it.
 - `0.x` makes no API stability promise. Minors may break the contract surface;
   this file will say so when they do.
 
-[Unreleased]: https://github.com/hjosugi/kofun-boot/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/hjosugi/kofun-boot/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/hjosugi/kofun-boot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/hjosugi/kofun-boot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hjosugi/kofun-boot/releases/tag/v0.1.0
