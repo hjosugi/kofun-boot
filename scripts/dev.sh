@@ -13,6 +13,7 @@ set -eu
 #   scripts/dev.sh --openapi  print the document the route table projects
 #   scripts/dev.sh --client   print the typed client the route table projects
 #   scripts/dev.sh --scaffold generate a project and run its gate
+#   scripts/dev.sh --replay   replay the recorded session trace
 #
 # The design rule is that the loop a developer runs and the loop CI runs are
 # the same commands, so a green terminal and a green pipeline mean the same
@@ -78,6 +79,9 @@ case "${1:-}" in
         ;;
     --client)
         sh "$ROOT/scripts/client-ts.sh"
+        ;;
+    --replay)
+        sh "$ROOT/scripts/trace.sh" replay "$ROOT/contracts/session.trace"
         ;;
     --scaffold)
         sh "$ROOT/tests/scaffold/check.sh"

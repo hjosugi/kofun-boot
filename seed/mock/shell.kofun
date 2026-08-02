@@ -1,0 +1,87 @@
+# The mock resource's imperative shell: the session, and the trace it emits.
+#
+# A trace is what makes an integration test replayable, and the shape of one
+# falls out of the core rather than being invented here. Because `apply`
+# returns the resource *and* what happened, a session is a fold — so a trace
+# is exactly the list of steps in that fold, and replaying is running the fold
+# again.
+#
+# Each step prints six integers on their own lines:
+#
+#   step      1-based, so a divergence can be named by position
+#   op        the operation kind
+#   arg_id    the id the operation named, or 0
+#   arg_value the value it carried, or 0
+#   outcome   the closed outcome kind
+#   payload   what that outcome carried
+#
+# and then two more describing the resource the step produced:
+#
+#   live      how many rows are live
+#   next_id   the counter, which is what makes creates deterministic
+#
+# Eight integers per step, nothing else. A format a reader can diff by eye and
+# a script can compare by line is worth more than one that needs a parser to
+# be understood, and this one costs nothing to produce because the core
+# already returns every number in it.
+
+fn emit_step(step_number: Int, op: Operation, transition: StoreStep) -> Int {
+    let after: Store = step_store(transition)
+    let outcome: MockOutcome = step_outcome(transition)
+    print(step_number)
+    print(op.kind)
+    print(op.id)
+    print(op.value)
+    print(outcome_kind(outcome))
+    print(outcome_payload(outcome))
+    print(live_count(after))
+    print(after.next_id)
+    return 0
+}
+
+fn main() -> Int {
+    # The session. Written here rather than read from anywhere, because the
+    # shell is the only layer allowed to decide what happens; the core decides
+    # only what each step means.
+    let start: Store = seeded_store()
+
+    let op1: Operation = operation(op_list(), 0, 0)
+    let t1: StoreStep = apply(start, op1)
+    emit_step(1, op1, t1)
+    let s1: Store = step_store(t1)
+
+    let op2: Operation = operation(op_create(), 0, 30)
+    let t2: StoreStep = apply(s1, op2)
+    emit_step(2, op2, t2)
+    let s2: Store = step_store(t2)
+
+    let op3: Operation = operation(op_show(), 3, 0)
+    let t3: StoreStep = apply(s2, op3)
+    emit_step(3, op3, t3)
+    let s3: Store = step_store(t3)
+
+    let op4: Operation = operation(op_update(), 1, 99)
+    let t4: StoreStep = apply(s3, op4)
+    emit_step(4, op4, t4)
+    let s4: Store = step_store(t4)
+
+    let op5: Operation = operation(op_delete(), 2, 0)
+    let t5: StoreStep = apply(s4, op5)
+    emit_step(5, op5, t5)
+    let s5: Store = step_store(t5)
+
+    # A miss, so the trace records that a refusal consumes nothing: the live
+    # count and the counter are unchanged from the step before.
+    let op6: Operation = operation(op_show(), 2, 0)
+    let t6: StoreStep = apply(s5, op6)
+    emit_step(6, op6, t6)
+    let s6: Store = step_store(t6)
+
+    # And a create after a delete, which is where a mock that rewound its
+    # counter would hand back the id it just freed.
+    let op7: Operation = operation(op_create(), 0, 55)
+    let t7: StoreStep = apply(s6, op7)
+    emit_step(7, op7, t7)
+
+    return 0
+}

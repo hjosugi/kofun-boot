@@ -11,7 +11,10 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 KOFUN="$ROOT/vendor/kofun/bin/kofun"
-OUT=${1:-"$ROOT/build/router"}
+# Which seed to assemble. Both are two layers with the same rule, so one
+# script serves both rather than each growing its own copy to drift from.
+SEED=${SEED:-router}
+OUT=${1:-"$ROOT/build/$SEED"}
 # Consume the destination so any remaining arguments are the caller's, not a
 # second copy of the path. Passing it twice made the builder echo the name and
 # this script print two lines, which a caller capturing the output then read
@@ -19,11 +22,13 @@ OUT=${1:-"$ROOT/build/router"}
 if test "$#" -gt 0; then shift; fi
 
 mkdir -p "$(dirname -- "$OUT")"
-UNIT="$(dirname -- "$OUT")/router.unit.kofun"
+UNIT="$(dirname -- "$OUT")/$SEED.unit.kofun"
 
-cat "$ROOT/seed/router/core.kofun" >"$UNIT"
+test -f "$ROOT/seed/$SEED/core.kofun" ||
+    { printf 'build-seed: no seed named %s\n' "$SEED" >&2; exit 2; }
+cat "$ROOT/seed/$SEED/core.kofun" >"$UNIT"
 printf '\n' >>"$UNIT"
-cat "$ROOT/seed/router/shell.kofun" >>"$UNIT"
+cat "$ROOT/seed/$SEED/shell.kofun" >>"$UNIT"
 
 # stdout belongs to this script: exactly one line, the path that was built.
 "$KOFUN" build "$UNIT" -o "$OUT" "$@" >/dev/null

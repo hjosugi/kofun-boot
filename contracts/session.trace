@@ -1,0 +1,12 @@
+# format: kofun-boot.trace/v1
+# columns: step op arg_id arg_value outcome payload live next_id
+# seed: seeded_store
+# language: 6e8d96b3
+# digest: 66f455a4af52409894dafe9d431c0e98b1cc29faa038d74b137407028aa7b6bc
+1	1	0	0	1	2	2	3
+2	3	0	30	3	3	3	4
+3	2	3	0	2	30	3	4
+4	4	1	99	4	1	3	4
+5	5	2	0	5	2	2	4
+6	2	2	0	6	2	2	4
+7	3	0	55	3	4	3	5

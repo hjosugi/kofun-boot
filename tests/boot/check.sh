@@ -233,6 +233,10 @@ fi
 if grep -qE '^fn main' "$WORK/mock.code"; then
     fail 'the mock core owns an entry point; emission belongs to the shell'
 fi
+mock_shell="$ROOT/seed/mock/shell.kofun"
+test -f "$mock_shell" || fail 'the mock shell is missing'
+grep -qE '^fn main' "$mock_shell" ||
+    fail 'the mock shell no longer owns the entry point; the boundary has moved without being moved'
 if grep -qE 'clock_gettime|gettimeofday|getenv|fopen|socket\(|__linux_syscall|import ' \
     "$WORK/mock.code"
 then
@@ -273,6 +277,31 @@ test "$table_rows" -eq "$document_ops" ||
     fail "the table has $table_rows routes and the document has $document_ops operations"
 
 printf 'boot: the OpenAPI document is a projection of the table the router ran: PASS\n'
+
+# ------------------------------------------------------- the session trace
+#
+# The replay lane's whole claim: a recorded session runs again and produces
+# the same bytes. It is only meaningful because nothing in the core can reach
+# a clock, an id source, or a file — so if this ever diverges, something
+# ambient got in, and the divergence is the alarm rather than the noise.
+
+trace="$ROOT/contracts/session.trace"
+test -f "$trace" || fail 'the recorded session trace is missing'
+sh "$ROOT/scripts/trace.sh" replay "$trace" >"$WORK/replay.log" 2>&1 ||
+    fail "the recorded session did not replay:
+$(sed 's/^/    /' "$WORK/replay.log")"
+
+# A create after a delete must not reuse the freed id: two resources sharing
+# an id are indistinguishable in a replay, which would make every trace above
+# worth less than it looks. Read from the trace rather than trusted.
+freed=$(grep -v '^#' "$trace" | awk -F'\t' '$5 == 5 { print $6 }' | head -1)
+allocated=$(grep -v '^#' "$trace" | awk -F'\t' '$2 == 3 { print $6 }' | tail -1)
+test -n "$freed" && test -n "$allocated" ||
+    fail 'the trace no longer contains both a delete and a later create'
+test "$freed" != "$allocated" ||
+    fail "a create reused the id a delete freed ($freed); ids must be spent"
+
+printf 'boot: a recorded session replays byte-identically, and freed ids stay spent: PASS\n'
 
 # ------------------------------------------------ the TypeScript client
 #
