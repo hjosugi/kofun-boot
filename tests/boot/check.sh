@@ -257,6 +257,38 @@ require_line 'command interpretation gained an undeclared capability bundle' \
 require_line 'subscription interpretation gained an undeclared capability bundle' \
     'capabilities: SubCapabilities' "$effects_contract"
 
+sed -n '/^type CmdCapabilities = {$/,/^}$/p' "$effects_contract" \
+    >"$WORK/effects.cmd-capabilities"
+sed -n '/^type SubCapabilities = {$/,/^}$/p' "$effects_contract" \
+    >"$WORK/effects.sub-capabilities"
+for capability in \
+    'clock: MonotonicClock' \
+    'http: HttpClient' \
+    'persistence: Persistence' \
+    'custom: CustomEffectInterpreter'
+do
+    require_line 'CmdCapabilities lost a dependency its Cmd vocabulary uses' \
+        "$capability" "$WORK/effects.cmd-capabilities"
+done
+for capability in \
+    'clock: MonotonicClock' \
+    'signals: SignalSource' \
+    'custom: CustomEffectInterpreter'
+do
+    require_line 'SubCapabilities lost a dependency its Sub vocabulary uses' \
+        "$capability" "$WORK/effects.sub-capabilities"
+done
+if grep -qE 'signals: SignalSource' "$WORK/effects.cmd-capabilities" ||
+    grep -qE 'http: HttpClient|persistence: Persistence' \
+        "$WORK/effects.sub-capabilities"
+then
+    fail 'an interpreter signature receives a capability its vocabulary cannot use'
+fi
+test "$(wc -l <"$WORK/effects.cmd-capabilities" | tr -d ' ')" -eq 6 ||
+    fail 'CmdCapabilities contains an unnamed dependency'
+test "$(wc -l <"$WORK/effects.sub-capabilities" | tr -d ' ')" -eq 5 ||
+    fail 'SubCapabilities contains an unnamed dependency'
+
 # Custom keeps both request families extensible. Check it before the generic
 # continuation loop so removing one fails as an openness violation rather
 # than as an incidental field mismatch.
@@ -271,17 +303,25 @@ test "$custom_count" -eq 2 ||
     fail "effects openness moved: expected Custom in Cmd and Sub, found $custom_count"
 
 # Correlation is inside every effecting constructor, not an application
-# convention. Each failure names the constructor whose continuation moved.
-for continuation in \
+# convention. Keep these separate: a moved field must name its constructor.
+require_line 'HttpRequest lost its on_result continuation' \
     '| HttpRequest(request: OutboundRequest, on_result: MsgId)' \
-    '| ReadClock(on_result: MsgId)' \
+    "$effects_contract"
+require_line 'ReadClock lost its on_result continuation' \
+    '| ReadClock(on_result: MsgId)' "$effects_contract"
+require_line 'Persist lost its on_result continuation' \
     '| Persist(entity: EntityId, bytes: Bytes, on_result: MsgId)' \
-    '| Every(interval_ms: Int, on_tick: MsgId)' \
-    '| OnSignal(signal: SignalId, on_signal: MsgId)'
-do
-    require_line 'an effect constructor lost its continuation' \
-        "$continuation" "$effects_contract"
-done
+    "$effects_contract"
+require_line 'Cmd.Custom lost its on_result continuation' \
+    '| Custom(tag: CmdTag, payload: Bytes, on_result: MsgId)' \
+    "$effects_contract"
+require_line 'Every lost its on_tick continuation' \
+    '| Every(interval_ms: Int, on_tick: MsgId)' "$effects_contract"
+require_line 'OnSignal lost its on_signal continuation' \
+    '| OnSignal(signal: SignalId, on_signal: MsgId)' "$effects_contract"
+require_line 'Sub.Custom lost its on_event continuation' \
+    '| Custom(tag: SubTag, payload: Bytes, on_event: MsgId)' \
+    "$effects_contract"
 
 if "$KOFUN" check "$effects_contract" \
     >"$WORK/effects.contract.stdout" 2>"$WORK/effects.contract.stderr"
@@ -414,7 +454,7 @@ if test "${EFFECTS_SKIP_BREAK_TEST:-0}" != 1; then
         fail 'dropping an effect continuation did not break the gate'
     fi
     require_line 'the continuation break was not rejected by name' \
-        'an effect constructor lost its continuation' \
+        'HttpRequest lost its on_result continuation' \
         "$WORK/effects.break-continuation.log"
 
     cp -R "$effects_module" "$effects_breaks/openness"
