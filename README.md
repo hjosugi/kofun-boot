@@ -36,6 +36,7 @@ cd ../my-app && sh tests/check.sh      # its own gate: boundary, suite, golden, 
 | `sh scripts/dev.sh --client` | the typed client the route table projects |
 | `sh scripts/dev.sh --scaffold` | generate a project and run its gate |
 | `sh scripts/dev.sh --replay` | replay the recorded session trace |
+| `sh scripts/dev.sh --release` | verify the release is coherent; tag nothing |
 | `sh scripts/dev.sh --check` | exactly what CI runs, in CI's order |
 
 The last row is the point: a green terminal and a green pipeline are the same
@@ -174,6 +175,9 @@ number quoted; hand-editing the OpenAPI document fails with the diff.
 | `tests/boot/check.sh` | the gate: boundary, contract, dispatch decisions, projection, determinism |
 | `tests/integration/serve.sh` | a real server on a real socket |
 | `tests/scaffold/check.sh` | `boot new`'s output, generated and gated every run |
+| `tests/release/check.sh` | the release gate: the declared unmeasured set must match the pillar table |
+| `VERSION`, `CHANGELOG.md` | the version, and what each release changed and left unmeasured |
+| `docs/RELEASING.md` | the version scheme and what the release gate refuses |
 | `docs/adr/` | the numbered decision log — why, and what it cost |
 | `docs/DESIGN.md`, `docs/ROADMAP.md` | the architecture; the lanes and what each is blocked on |
 | `docs/BACKLOG.md` | the epic decomposition, issue shape, and labels |
