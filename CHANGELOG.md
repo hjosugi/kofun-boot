@@ -33,6 +33,9 @@ runtime, scheduler, live network interpreter, or unscoped spawn.
   including HTTP timeout.
 - **Third bounded context** — `effects` owns contract, core, shell, tests, and
   golden evidence under the module layout established in 0.2.0.
+- **Updated research pack** — the deterministic ZIP includes the implemented
+  effect-boundary evidence and has SHA-256
+  `1311cff238853cb6818294354a0d4e07aa41ccee3010be507a00b1986c851533`.
 
 ### Gates
 
