@@ -11,6 +11,7 @@ set -eu
 #   scripts/dev.sh --serve    the integration test: a real server, real sockets
 #   scripts/dev.sh --check    everything CI runs, in CI's order
 #   scripts/dev.sh --openapi  print the document the route table projects
+#   scripts/dev.sh --research build the deterministic research ZIP
 #   scripts/dev.sh --client   print the typed client the route table projects
 #   scripts/dev.sh --scaffold generate a project and run its gate
 #   scripts/dev.sh --replay   replay the recorded session trace
@@ -23,7 +24,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 KOTEST="$ROOT/vendor/kofun/tooling/kotest/run.sh"
 
 usage() {
-    sed -n '3,14p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 banner() {
@@ -77,6 +78,9 @@ case "${1:-}" in
     --openapi)
         sh "$ROOT/scripts/openapi.sh"
         ;;
+    --research)
+        sh "$ROOT/scripts/build-research-pack.sh" "$ROOT/dist"
+        ;;
     --client)
         sh "$ROOT/scripts/client-ts.sh"
         ;;
@@ -95,6 +99,7 @@ case "${1:-}" in
         # pipeline's green cannot come to mean different things.
         run_tests
         sh "$ROOT/tests/boot/check.sh"
+        sh "$ROOT/tests/research/check.sh"
         sh "$ROOT/tests/integration/serve.sh"
         sh "$ROOT/tests/scaffold/check.sh"
         ;;
