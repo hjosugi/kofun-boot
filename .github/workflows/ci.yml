@@ -74,3 +74,13 @@ jobs:
         with:
           submodules: true
       - run: sh tests/scaffold/check.sh
+
+  release:
+    name: Release coherence — the declared unmeasured set matches the README
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The gate refuses to re-use an existing tag, so it needs the tags.
+          fetch-depth: 0
+      - run: sh tests/release/check.sh
