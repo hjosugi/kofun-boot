@@ -34,6 +34,7 @@ cd ../my-app && sh tests/check.sh      # its own gate: boundary, suite, golden, 
 | `sh scripts/dev.sh --openapi` | the document the route table projects |
 | `sh scripts/dev.sh --client` | the typed client the route table projects |
 | `sh scripts/dev.sh --scaffold` | generate a project and run its gate |
+| `sh scripts/dev.sh --replay` | replay the recorded session trace |
 | `sh scripts/dev.sh --check` | exactly what CI runs, in CI's order |
 
 The last row is the point: a green terminal and a green pipeline are the same
@@ -74,6 +75,31 @@ Three properties follow that a file-mutating mock cannot offer: the same seed
 and the same requests **replay byte-identically**; a test can assert the
 resource *between* two requests; and `POST` allocates from a counter carried
 in the value, so ids are deterministic with **no clock and no entropy**.
+
+### Replay — a recorded session, run again
+
+There was no trace format to design. `apply` already returns the resource and
+what happened, so a session is a fold and a trace is the list of steps in it —
+eight integers a reader can diff by eye.
+
+```sh
+sh scripts/trace.sh record            # write contracts/session.trace
+sh scripts/trace.sh replay contracts/session.trace
+```
+
+Replay runs under `env -i` and refuses on the first divergence, naming the
+step and printing both rows. Making `delete` rewind the id counter — the
+json-server behaviour this design exists to avoid — produces:
+
+```
+trace: FAIL: the session diverged at step 5
+  columns:  step op arg_id arg_value outcome payload live next_id
+  recorded: 5 5 2 0 5 2 2 4
+  replayed: 5 5 2 0 5 2 2 2
+```
+
+Caught where it happened, not as a mysterious id collision two steps later.
+Editing the trace by hand is refused separately, by its digest.
 
 ### The projections — one declaration, many artifacts
 
@@ -129,7 +155,7 @@ number quoted; hand-editing the OpenAPI document fails with the diff.
 | Contract-first APIs | servant, FastAPI, Elysia | routes, validation, OpenAPI, and the typed client derive from **one** declaration; drift is a build failure — **holds for the document and the TypeScript client today** |
 | Capabilities, not containers | Spring DI, inverted | no container and no reflection; the core **may not construct** a capability, enforced by a gate that prints the offending line |
 | Functional core, imperative shell | FCIS, functional DDD | enforced by construction — **holds today** |
-| Deterministic replay | Kofun's gate culture | identical bytes on both backends, twice, under a hostile `TZ`, locale, and `env -i` — **holds today** |
+| Deterministic replay | Kofun's gate culture | identical bytes on both backends, twice, under a hostile `TZ`, locale, and `env -i`, **and a recorded session replays step-for-step — holds today** |
 | Speed | Elysia, Gin, Hono | requests/sec published with its method — *unmeasured; no number appears here before the gate that measured it* |
 | Structured concurrency | Go's ergonomics, without the leaks | scoped spawn/join, deterministic schedules — blocked on the language RFC, and says so |
 | Desktop lighter than Tauri | Tauri, inverted | binary size and cold start as gated numbers — *unmeasured* |
@@ -141,8 +167,8 @@ number quoted; hand-editing the OpenAPI document fails with the diff.
 |---|---|
 | `contracts/` | canonical surfaces ahead of the compiler, pinned by gates; the generated OpenAPI document |
 | `seed/router/` | the dispatcher: core, shell, unit suite, golden |
-| `seed/mock/` | the REST resource: core, unit suite |
-| `scripts/` | `dev.sh`, `new.sh`, `build-seed.sh`, `openapi.sh`, `client-ts.sh` |
+| `seed/mock/` | the REST resource: core, shell, unit suite, recorded trace |
+| `scripts/` | `dev.sh`, `new.sh`, `build-seed.sh`, `openapi.sh`, `client-ts.sh`, `trace.sh` |
 | `tests/client/` | one call that must compile, two that must not |
 | `tests/boot/check.sh` | the gate: boundary, contract, dispatch decisions, projection, determinism |
 | `tests/integration/serve.sh` | a real server on a real socket |
