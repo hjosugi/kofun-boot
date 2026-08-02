@@ -1,0 +1,36 @@
+openapi: 3.1.0
+info:
+  title: kofun-boot seed
+  version: 0.1.0
+paths:
+  /hello:
+    get:
+      operationId: handler1
+      responses:
+        "200": { description: ok }
+        "404": { description: no route matched }
+        "405": { description: method not allowed }
+        "413": { description: body over the limit }
+  /sum:
+    post:
+      operationId: handler2
+      responses:
+        "200": { description: ok }
+        "404": { description: no route matched }
+        "405": { description: method not allowed }
+        "413": { description: body over the limit }
+  /bench:
+    get:
+      operationId: handler3
+      responses:
+        "200": { description: ok }
+        "404": { description: no route matched }
+        "405": { description: method not allowed }
+        "413": { description: body over the limit }
+    post:
+      operationId: handler4
+      responses:
+        "200": { description: ok }
+        "404": { description: no route matched }
+        "405": { description: method not allowed }
+        "413": { description: body over the limit }

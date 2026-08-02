@@ -240,6 +240,40 @@ then
 fi
 
 printf 'boot: the core cannot construct a capability, and does not own main: PASS\n'
+# ------------------------------------------------- the OpenAPI projection
+#
+# The document is generated from the twelve lines the router printed, so it
+# cannot describe a route the dispatcher does not serve. Two things are
+# checked: the recorded document still matches what the table projects, and
+# every route in the table reaches the document — the second catches a route
+# added to the table whose path has no name, which would otherwise appear as a
+# number or vanish.
+
+recorded="$ROOT/contracts/openapi.yaml"
+test -f "$recorded" || fail 'the recorded OpenAPI document is missing'
+
+sh "$ROOT/scripts/openapi.sh" "$WORK/router" >"$WORK/openapi.yaml" ||
+    fail 'the OpenAPI projection failed'
+cmp "$recorded" "$WORK/openapi.yaml" ||
+    fail "the recorded OpenAPI document no longer matches the table the router runs:
+$(diff "$recorded" "$WORK/openapi.yaml" | head -12)"
+
+# Every distinct path in the table appears exactly once as a path object, and
+# every row appears as a method under it. Counting rather than eyeballing: a
+# projection that silently dropped a route would still cmp clean against a
+# golden regenerated from the same bug.
+table_paths=$(sed -n '1,12p' "$expected" | paste - - - | awk '{print $2}' | sort -u | wc -l)
+document_paths=$(grep -cE '^  /' "$recorded")
+test "$table_paths" -eq "$document_paths" ||
+    fail "the table has $table_paths paths and the document has $document_paths"
+
+table_rows=$(sed -n '1,12p' "$expected" | paste - - - | wc -l)
+document_ops=$(grep -cE '^      operationId:' "$recorded")
+test "$table_rows" -eq "$document_ops" ||
+    fail "the table has $table_rows routes and the document has $document_ops operations"
+
+printf 'boot: the OpenAPI document is a projection of the table the router ran: PASS\n'
+
 printf 'boot: canonical contract pinned at its boundary: PASS\n'
 printf 'boot: fixed-rank dispatch, every closed outcome read by name: PASS\n'
 printf 'boot: handlers are pure and time is an injected capability: PASS\n'

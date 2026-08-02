@@ -10,6 +10,7 @@ set -eu
 #   scripts/dev.sh --test     the unit suite only (fastest useful loop)
 #   scripts/dev.sh --serve    the integration test: a real server, real sockets
 #   scripts/dev.sh --check    everything CI runs, in CI's order
+#   scripts/dev.sh --openapi  print the document the route table projects
 #
 # The design rule is that the loop a developer runs and the loop CI runs are
 # the same commands, so a green terminal and a green pipeline mean the same
@@ -69,6 +70,9 @@ case "${1:-}" in
     --test)
         shift
         run_tests "$@"
+        ;;
+    --openapi)
+        sh "$ROOT/scripts/openapi.sh"
         ;;
     --serve)
         banner "serve"
