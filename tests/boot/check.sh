@@ -217,6 +217,28 @@ test "$lines" -eq 53 ||
 dupes=$(sed -n '1,12p' "$expected" | paste - - - | awk '{print $1, $2}' | sort | uniq -d)
 test -z "$dupes" || fail "duplicate (method, path) pair in the table: $dupes"
 
+# The mock resource's core lives under the same rule: it may receive a store
+# and an operation, and may not construct a capability or own an entry point.
+# A second core added without a second check is a boundary that exists for one
+# directory.
+mock_core="$ROOT/seed/mock/core.kofun"
+test -f "$mock_core" || fail 'mock core is missing'
+sed 's/[[:space:]]*#.*$//' "$mock_core" >"$WORK/mock.code"
+if grep -qE 'Capabilities\(' "$WORK/mock.code"; then
+    printf '%s\n' \
+        'boot: FAIL: the mock core constructs a capability instead of receiving one:' >&2
+    grep -nE 'Capabilities\(' "$WORK/mock.code" >&2
+    exit 1
+fi
+if grep -qE '^fn main' "$WORK/mock.code"; then
+    fail 'the mock core owns an entry point; emission belongs to the shell'
+fi
+if grep -qE 'clock_gettime|gettimeofday|getenv|fopen|socket\(|__linux_syscall|import ' \
+    "$WORK/mock.code"
+then
+    fail 'the mock core names ambient state'
+fi
+
 printf 'boot: the core cannot construct a capability, and does not own main: PASS\n'
 printf 'boot: canonical contract pinned at its boundary: PASS\n'
 printf 'boot: fixed-rank dispatch, every closed outcome read by name: PASS\n'

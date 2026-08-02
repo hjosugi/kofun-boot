@@ -34,7 +34,8 @@ elapsed() {
 
 run_tests() {
     banner "unit"
-    sh "$KOTEST" "$ROOT/seed/router/core_test.kofun" "$@"
+    sh "$KOTEST" "$ROOT/seed/router/core_test.kofun" \
+        "$ROOT/seed/mock/core_test.kofun" "$@"
 }
 
 run_seed() {
@@ -86,7 +87,8 @@ case "${1:-}" in
         # and prints the same protocol. Delegating means one watcher, one set
         # of semantics, and no second implementation to keep honest.
         banner "watching seed/ — save to re-run"
-        sh "$KOTEST" --watch "$ROOT/seed/router/core_test.kofun" "$@"
+        sh "$KOTEST" --watch "$ROOT/seed/router/core_test.kofun" \
+            "$ROOT/seed/mock/core_test.kofun" "$@"
         ;;
     "")
         once

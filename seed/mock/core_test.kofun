@@ -1,0 +1,177 @@
+# Unit tests for the mock resource.
+#
+# These read like the json-server sessions a developer actually runs — list,
+# create, show, update, delete — with one difference that is the whole point:
+# every step names the store it produced, so a test can assert what the
+# resource looked like *between* two requests. json-server cannot be asked
+# that question, because the answer is in a file that has already moved on.
+
+fn test_a_seeded_resource_lists_its_rows() -> Int {
+    let store: Store = seeded_store()
+    let step: StoreStep = apply(store, operation(op_list(), 0, 0))
+    let mut failures = 0
+    failures = failures
+        + expect_eq_int(outcome_kind(step_outcome(step)), outcome_collection())
+    failures = failures + expect_eq_int(outcome_payload(step_outcome(step)), 2)
+    return failures
+}
+
+fn test_show_returns_the_row_and_a_miss_names_the_id() -> Int {
+    let store: Store = seeded_store()
+    let hit: StoreStep = apply(store, operation(op_show(), 2, 0))
+    let miss: StoreStep = apply(store, operation(op_show(), 99, 0))
+    let mut failures = 0
+    failures = failures
+        + expect_eq_int(outcome_kind(step_outcome(hit)), outcome_item())
+    failures = failures + expect_eq_int(outcome_payload(step_outcome(hit)), 20)
+    failures = failures
+        + expect_eq_int(outcome_kind(step_outcome(miss)), outcome_missing())
+    failures = failures + expect_eq_int(outcome_payload(step_outcome(miss)), 99)
+    return failures
+}
+
+# The property json-server cannot offer: a read leaves the resource alone, and
+# the test can prove it by comparing the store on both sides of the call.
+fn test_a_read_does_not_move_the_resource() -> Int {
+    let store: Store = seeded_store()
+    let listed: Store = step_store(apply(store, operation(op_list(), 0, 0)))
+    let shown: Store = step_store(apply(store, operation(op_show(), 1, 0)))
+    let missed: Store = step_store(apply(store, operation(op_show(), 99, 0)))
+    let mut failures = 0
+    failures = failures + expect_eq_int(live_count(listed), live_count(store))
+    failures = failures + expect_eq_int(listed.next_id, store.next_id)
+    failures = failures + expect_eq_int(live_count(shown), live_count(store))
+    failures = failures + expect_eq_int(missed.next_id, store.next_id)
+    return failures
+}
+
+# Ids come from the store, so the same seed and the same requests allocate the
+# same ids — every time, on every machine, with no clock and no entropy.
+fn test_create_allocates_deterministically() -> Int {
+    let store: Store = seeded_store()
+    let first: StoreStep = apply(store, operation(op_create(), 0, 30))
+    let second: StoreStep = apply(step_store(first), operation(op_create(), 0, 40))
+    let mut failures = 0
+    failures = failures
+        + expect_eq_int(outcome_kind(step_outcome(first)), outcome_created())
+    failures = failures + expect_eq_int(outcome_payload(step_outcome(first)), 3)
+    failures = failures + expect_eq_int(outcome_payload(step_outcome(second)), 4)
+    failures = failures + expect_eq_int(live_count(step_store(second)), 4)
+    # …and replaying the same sequence from the same seed gives the same ids.
+    let replay_one: StoreStep = apply(seeded_store(), operation(op_create(), 0, 30))
+    let replay_two: StoreStep = apply(step_store(replay_one), operation(op_create(), 0, 40))
+    failures = failures + expect_eq_int(
+        outcome_payload(step_outcome(replay_two)),
+        outcome_payload(step_outcome(second))
+    )
+    return failures
+}
+
+fn test_a_created_row_is_then_readable() -> Int {
+    let created: StoreStep = apply(seeded_store(), operation(op_create(), 0, 77))
+    let store: Store = step_store(created)
+    let id: Int = outcome_payload(step_outcome(created))
+    let shown: StoreStep = apply(store, operation(op_show(), id, 0))
+    let mut failures = 0
+    failures = failures
+        + expect_eq_int(outcome_kind(step_outcome(shown)), outcome_item())
+    failures = failures + expect_eq_int(outcome_payload(step_outcome(shown)), 77)
+    return failures
+}
+
+fn test_update_replaces_the_value_and_a_miss_changes_nothing() -> Int {
+    let store: Store = seeded_store()
+    let updated: StoreStep = apply(store, operation(op_update(), 1, 99))
+    let after: Store = step_store(updated)
+    let missed: StoreStep = apply(store, operation(op_update(), 42, 99))
+    let mut failures = 0
+    failures = failures
+        + expect_eq_int(outcome_kind(step_outcome(updated)), outcome_updated())
+    failures = failures + expect_eq_int(value_of(after, 1), 99)
+    failures = failures + expect_eq_int(live_count(after), live_count(store))
+    failures = failures
+        + expect_eq_int(outcome_kind(step_outcome(missed)), outcome_missing())
+    let after_miss: Store = step_store(missed)
+    failures = failures + expect_eq_int(live_count(after_miss), live_count(store))
+    return failures
+}
+
+fn test_delete_frees_a_slot_but_does_not_rewind_the_counter() -> Int {
+    let store: Store = seeded_store()
+    let deleted: StoreStep = apply(store, operation(op_delete(), 1, 0))
+    let after: Store = step_store(deleted)
+    let mut failures = 0
+    failures = failures
+        + expect_eq_int(outcome_kind(step_outcome(deleted)), outcome_deleted())
+    failures = failures + expect_eq_int(live_count(after), 1)
+    failures = failures + expect_eq_int(id_hits(after, 1), 0)
+    # The counter is untouched, so the next create cannot reuse the dead id —
+    # two resources with the same id would be indistinguishable in a replay.
+    failures = failures + expect_eq_int(after.next_id, store.next_id)
+    let recreated: StoreStep = apply(after, operation(op_create(), 0, 55))
+    failures = failures
+        + expect_ne_int(outcome_payload(step_outcome(recreated)), 1)
+    failures = failures
+        + expect_eq_int(outcome_payload(step_outcome(recreated)), 3)
+    return failures
+}
+
+fn test_a_full_resource_names_its_capacity() -> Int {
+    # Record bindings are immutable in this slice, so each step of the session
+    # gets its own name. That reads as a limitation and behaves as a feature:
+    # every intermediate resource is still in scope for an assertion.
+    let seeded: Store = seeded_store()
+    let third: Store = step_store(apply(seeded, operation(op_create(), 0, 30)))
+    let store: Store = step_store(apply(third, operation(op_create(), 0, 40)))
+    let overflowing: StoreStep = apply(store, operation(op_create(), 0, 50))
+    let mut failures = 0
+    failures = failures + expect_eq_int(live_count(store), 4)
+    failures = failures
+        + expect_eq_int(outcome_kind(step_outcome(overflowing)), outcome_full())
+    failures = failures
+        + expect_eq_int(outcome_payload(step_outcome(overflowing)), capacity())
+    # A refused create consumes nothing, counter included.
+    let after_refusal: Store = step_store(overflowing)
+    failures = failures + expect_eq_int(after_refusal.next_id, store.next_id)
+    return failures
+}
+
+# A session is a fold. This is the shape that makes an integration test
+# replayable: same seed, same operations, same final resource.
+fn test_a_session_is_a_fold_and_replays() -> Int {
+    let a0: Store = seeded_store()
+    let a1: Store = step_store(apply(a0, operation(op_create(), 0, 30)))
+    let a2: Store = step_store(apply(a1, operation(op_delete(), 1, 0)))
+    let a: Store = step_store(apply(a2, operation(op_update(), 2, 21)))
+
+    let b0: Store = seeded_store()
+    let b1: Store = step_store(apply(b0, operation(op_create(), 0, 30)))
+    let b2: Store = step_store(apply(b1, operation(op_delete(), 1, 0)))
+    let b: Store = step_store(apply(b2, operation(op_update(), 2, 21)))
+
+    let mut failures = 0
+    failures = failures + expect_eq_int(live_count(a), live_count(b))
+    failures = failures + expect_eq_int(a.next_id, b.next_id)
+    failures = failures + expect_eq_int(value_of(a, 2), value_of(b, 2))
+    failures = failures + expect_eq_int(value_of(a, 2), 21)
+    failures = failures + expect_eq_int(id_hits(a, 3), 1)
+    failures = failures + expect_eq_int(id_hits(a, 1), 0)
+    return failures
+}
+
+# Every operation, including ones the surface never emits, produces exactly
+# one outcome. A mock server with an undefined case is a mock server that
+# lies about the real one.
+fn test_apply_is_total() -> Int {
+    let store: Store = seeded_store()
+    let mut failures = 0
+    failures = failures + expect_between_int(
+        outcome_kind(step_outcome(apply(store, operation(0, 0, 0)))), 1, 7)
+    failures = failures + expect_between_int(
+        outcome_kind(step_outcome(apply(store, operation(99, 0, 0)))), 1, 7)
+    failures = failures + expect_between_int(
+        outcome_kind(step_outcome(apply(store, operation(op_show(), 0 - 1, 0)))), 1, 7)
+    failures = failures + expect_between_int(
+        outcome_kind(step_outcome(apply(store, operation(op_delete(), 0, 0)))), 1, 7)
+    return failures
+}
