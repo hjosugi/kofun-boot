@@ -19,12 +19,19 @@ jobs:
           submodules: true
       - name: Report the pinned language revision
         run: git -C vendor/kofun log -1 --format='vendor/kofun is at %h %s'
-      - name: Router core
-        run: sh vendor/kofun/tooling/kotest/run.sh seed/router/core_test.kofun
-      - name: Mock resource core
-        run: sh vendor/kofun/tooling/kotest/run.sh seed/mock/core_test.kofun
+      - name: Every module core
+        run: sh scripts/test-modules.sh
       - name: A recorded session replays
         run: sh scripts/trace.sh replay contracts/session.trace
+
+  architecture:
+    name: Modules — owned verticals and contract-only dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - run: sh tests/architecture/check.sh
 
   gate:
     name: Boot gate

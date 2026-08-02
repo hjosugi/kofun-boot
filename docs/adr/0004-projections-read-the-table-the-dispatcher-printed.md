@@ -17,7 +17,7 @@ error[E2S15]: Core function `method_name` requires Int or concrete enum
               parameters and return
 ```
 
-`Text` is not a Core return type today. `contracts/boot.kofun` declares
+`Text` is not a Core return type today. `modules/router/contract/router.kofun` declares
 `fn boot_openapi(table: RouteTable) -> Text` and is pinned at that boundary,
 which is the honest place for it — but it does not execute, so the promise
 cannot rest on it yet.
@@ -26,7 +26,7 @@ cannot rest on it yet.
 
 The projection reads the bytes the shell already prints.
 
-`seed/router/shell.kofun` emits the compiled table as its first twelve lines,
+`modules/router/shell/router.kofun` emits the compiled table as its first twelve lines,
 because the gate pins it there. `scripts/openapi.sh` consumes exactly those
 bytes and emits the document. So the document is generated *from the table the
 dispatcher ran*, not from a second declaration that resembles it — which is

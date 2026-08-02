@@ -5,7 +5,7 @@ set -eu
 #
 # Three things are checked, in this order:
 #
-#   1. the canonical surface in contracts/ still declares the framework
+#   1. the router-owned canonical surface still declares the framework
 #      contract, and still stops at the documented compiler boundary rather
 #      than pretending to be executable;
 #   2. the executable seed runs identically on the reference interpreter and
@@ -39,7 +39,7 @@ test -x "$KOFUN" || test -f "$KOFUN" ||
 
 # ---------------------------------------------------- canonical surface
 
-canonical="$ROOT/contracts/boot.kofun"
+canonical="$ROOT/modules/router/contract/router.kofun"
 test -f "$canonical" || fail 'canonical surface is missing'
 
 for declaration in \
@@ -82,9 +82,9 @@ require_line 'canonical surface did not stop at the documented boundary' \
 
 # ------------------------------------------------------------------ seed
 
-core="$ROOT/seed/router/core.kofun"
-shell="$ROOT/seed/router/shell.kofun"
-expected="$ROOT/seed/router/router.stdout"
+core="$ROOT/modules/router/core/router.kofun"
+shell="$ROOT/modules/router/shell/router.kofun"
+expected="$ROOT/modules/router/tests/router.stdout"
 test -f "$core" || fail 'core source is missing'
 test -f "$shell" || fail 'shell source is missing'
 test -f "$expected" || fail 'seed golden is missing'
@@ -221,8 +221,31 @@ test -z "$dupes" || fail "duplicate (method, path) pair in the table: $dupes"
 # and an operation, and may not construct a capability or own an entry point.
 # A second core added without a second check is a boundary that exists for one
 # directory.
-mock_core="$ROOT/seed/mock/core.kofun"
+mock_contract="$ROOT/modules/mock/contract/mock.kofun"
+mock_core="$ROOT/modules/mock/core/mock.kofun"
+test -f "$mock_contract" || fail 'mock canonical contract is missing'
 test -f "$mock_core" || fail 'mock core is missing'
+
+# Business refusal is a value.  Pin the complete outcome block between the
+# rich canonical contract and its bounded Stage 2 seed so neither can add a
+# default, drop an observed value, or silently rename a rule.
+sed -n '/^type MockOutcome =$/,/^$/p' "$mock_contract" >"$WORK/mock.contract.outcome"
+sed -n '/^type MockOutcome =$/,/^$/p' "$mock_core" >"$WORK/mock.seed.outcome"
+cmp "$WORK/mock.contract.outcome" "$WORK/mock.seed.outcome" ||
+    fail "mock business outcomes differ between canonical contract and seed:
+$(diff "$WORK/mock.contract.outcome" "$WORK/mock.seed.outcome")"
+for observed in \
+    'Collection(live: Int)' \
+    'Item(value: Int)' \
+    'Created(id: Int)' \
+    'Updated(id: Int)' \
+    'Deleted(id: Int)' \
+    'Missing(id: Int)' \
+    'Full(capacity: Int)'
+do
+    require_line 'mock canonical outcome lost its observed value' \
+        "$observed" "$mock_contract"
+done
 sed 's/[[:space:]]*#.*$//' "$mock_core" >"$WORK/mock.code"
 if grep -qE 'Capabilities\(' "$WORK/mock.code"; then
     printf '%s\n' \
@@ -233,7 +256,7 @@ fi
 if grep -qE '^fn main' "$WORK/mock.code"; then
     fail 'the mock core owns an entry point; emission belongs to the shell'
 fi
-mock_shell="$ROOT/seed/mock/shell.kofun"
+mock_shell="$ROOT/modules/mock/shell/mock.kofun"
 test -f "$mock_shell" || fail 'the mock shell is missing'
 grep -qE '^fn main' "$mock_shell" ||
     fail 'the mock shell no longer owns the entry point; the boundary has moved without being moved'
@@ -244,6 +267,7 @@ then
 fi
 
 printf 'boot: the core cannot construct a capability, and does not own main: PASS\n'
+printf 'boot: mock business rules are a closed sum and every refusal carries what was observed: PASS\n'
 # ------------------------------------------------- the OpenAPI projection
 #
 # The document is generated from the twelve lines the router printed, so it

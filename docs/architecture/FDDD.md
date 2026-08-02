@@ -53,7 +53,7 @@ type UpgradeDecision =
 Nothing is a bare `false`, and nothing is an exception — because a customer
 being overdrawn is not a malfunction, it is an answer.
 
-That is the identical rule `contracts/boot.kofun` already applies to routing:
+That is the identical rule `modules/router/contract/router.kofun` already applies to routing:
 `MethodNotAllowed(allowed: List[Method])` carries the methods that would have
 worked; `PayloadTooLarge(limit, observed)` carries both numbers. **The
 framework's own contract and the applications built on it obey one rule**, and
@@ -92,7 +92,7 @@ them to different degrees today:
 
 Where Kofun cannot yet express one of these, the framework's contract declares
 it and the gate pins the boundary — the pattern this repository already uses
-for `contracts/boot.kofun`.
+for `modules/router/contract/router.kofun`.
 
 ## The controller is where FCIS becomes visible
 

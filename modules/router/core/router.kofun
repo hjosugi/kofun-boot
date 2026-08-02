@@ -6,8 +6,8 @@
 # paragraph. Handlers receive their capabilities as an argument because the
 # language gives them no ambient authority to reach instead.
 #
-# The shell (shell.kofun) owns the table, the capability record, and every
-# emission. scripts/build-seed.sh concatenates the two, the way
+# The module shell (../shell/router.kofun) owns the table, the capability
+# record, and every emission. scripts/build-seed.sh concatenates the two, the way
 # framework/http/build.sh combines its declarations with an application.
 #
 fn method_get() -> Int {

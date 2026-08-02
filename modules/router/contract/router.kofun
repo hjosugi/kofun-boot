@@ -4,9 +4,9 @@
 # the shapes the language specifies — Text, List, multi-payload sums, Result —
 # and tests/boot/check.sh requires it to keep failing at the documented
 # compiler boundary, exactly as the language repository pins its own clock and
-# tzdb surfaces. The executable evidence is seed/router/router.kofun, which
-# projects these decisions into the Stage 2 slice without changing one of
-# them.
+# tzdb surfaces. The executable evidence is ../core/router.kofun plus
+# ../shell/router.kofun, which project these decisions into the Stage 2 slice
+# without changing one of them.
 #
 # Three rules shape everything below.
 #

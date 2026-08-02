@@ -43,6 +43,8 @@ docs/adr/0001-record-architecture-decisions.md
 docs/adr/0002-enforce-boundaries-by-gate-not-by-named-test.md
 docs/adr/0003-mutations-return-a-new-state.md
 docs/adr/0004-projections-read-the-table-the-dispatcher-printed.md
+docs/adr/0005-a-trace-is-the-fold-the-core-already-performs.md
+docs/adr/0006-a-module-owns-its-whole-vertical.md
 '
 
 printf '%s\n' "$FILES" | while IFS= read -r file; do

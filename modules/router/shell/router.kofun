@@ -2,7 +2,8 @@
 #
 # Everything the core is forbidden to name lives here, in one place a reader
 # can hold: which routes exist, what the capability record contains, and what
-# gets printed. Concatenated after core.kofun by scripts/build-seed.sh.
+# gets printed. Concatenated after ../core/router.kofun by
+# scripts/build-seed.sh.
 
 fn emit_dispatch(table: RouteTable, request: Request) -> Int {
     let result: RouteResult = dispatch(table, request)

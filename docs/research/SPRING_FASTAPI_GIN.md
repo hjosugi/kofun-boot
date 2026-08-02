@@ -81,7 +81,7 @@ pytestからappを直接テストする。
   分ける。
 
 一方、kofun-boot は decorator metadata と実行時 dependency graph を真実には
-しない。`contracts/boot.kofun` の endpoint 値をbuild時に全投影し、投影が一件でも
+しない。`modules/router/contract/router.kofun` の endpoint 値をbuild時に全投影し、投影が一件でも
 欠ければ route count gate が失敗する。dependencyがrequest validationを追加する
 場合も、隠れた graph edge ではなく endpoint 値のinput contractとして現れる。
 
