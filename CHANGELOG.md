@@ -13,6 +13,73 @@ the `Unmeasured at this release` section added as a local requirement.
 
 Nothing yet.
 
+## [0.2.0] - 2026-08-02
+
+Bounded contexts now own their complete vertical. This is a breaking path
+change below 1.0.0: code and tests formerly under `seed/` moved into modules,
+and the router's canonical contract moved with its owner.
+
+### Changed
+
+- **Module ownership** — `router` and `mock` now each own `contract/`, `core/`,
+  `shell/`, and `tests/` under `modules/<name>/`. The generic build and test
+  adapters discover that layout instead of carrying a registry of module
+  names.
+- **Canonical contract location** — the router surface moved from
+  `contracts/boot.kofun` to `modules/router/contract/router.kofun`.
+  `contracts/` now contains projected/public artifacts rather than another
+  module's source of truth.
+- **Research pack** — the modular-monolith/DDD dossier now records the
+  implemented evidence, ADR 5 and ADR 6 are included, and the deterministic
+  archive digest is
+  `bd489900e1e526a6193a2af39a6173a24547a5c070d6cb62692bd03762583e8e`.
+
+### Added
+
+- **Contract-only dependency gate** — a data-driven architecture gate requires
+  every module to own its four layers and lets one module name only another's
+  public contract. Canonical, dotted, and relative path spellings are checked.
+- **Gate tested both ways** — the architecture fixture adds a third `orders`
+  module without editing the existing two, then injects
+  `../../router/core/router` and requires a diagnostic with the offending
+  source, line, and allowed contract target.
+- **Closed business outcome contract** — `modules/mock/contract/mock.kofun`
+  models domain refusal as `MockOutcome`. The boot gate compares all seven
+  constructors with the executable seed and requires every case to carry what
+  was observed.
+- **ADR 6** — records why a bounded context owns contract, core, shell, and
+  tests, and why the assembly adapters are temporary compiler seams rather
+  than a second ownership model.
+
+### Gates
+
+- 22/22 module-owned core tests pass through the filesystem-discovered test
+  adapter.
+- A third module passes without changes to existing modules; an internal
+  cross-module reference fails with source, line, and allowed target.
+- The boot gate pins the rich/executable outcome sum, all router projections,
+  trace replay, and hostile-environment determinism.
+- The deterministic research ZIP, real-socket integration suite, generated
+  scaffold, and release coherence gate all pass.
+
+### Unmeasured at this release
+
+- Speed — L5; the benchmark harness exists and refuses to produce a number it
+  does not trust, but no baseline has been recorded.
+- Desktop lighter than Tauri — L9; blocked on the language's wasm32 activation
+  lanes, and gated behind IME and accessibility conformance before any number
+  is recorded ([#29](https://github.com/hjosugi/kofun-boot/issues/29)).
+
+### Known boundaries
+
+- The executable Kofun slice has no module imports yet. Build and test adapters
+  concatenate module-owned files in a deterministic order; generated units do
+  not enter the worktree.
+- Contract-only imports are gated as source references today. The first native
+  import implementation must retain the same break test.
+- Outbox/Inbox, module-local database schemas, and event sourcing remain
+  adopt/adapt/defer decisions, not claims of executable data-lane support.
+
 ## [0.1.0] - 2026-08-02
 
 First tagged release. A working contract-first slice, a research corpus with
@@ -90,5 +157,6 @@ is blocked on the lane named beside it.
 - `0.x` makes no API stability promise. Minors may break the contract surface;
   this file will say so when they do.
 
-[Unreleased]: https://github.com/hjosugi/kofun-boot/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/hjosugi/kofun-boot/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/hjosugi/kofun-boot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hjosugi/kofun-boot/releases/tag/v0.1.0

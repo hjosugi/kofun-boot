@@ -2,7 +2,7 @@
 
 Decided 2026-08-02 from [`docs/research/EFFECT_SYSTEMS.md`](../research/EFFECT_SYSTEMS.md).
 This document is the reasoning; the canonical shapes belong in `contracts/`
-and the executable evidence in `seed/`.
+and the executable evidence in `modules/*/core`.
 
 ## The decision in one paragraph
 
@@ -51,8 +51,9 @@ and that sentence is true with or without a monad.
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-Layers 1 and 2 exist in the repository today in spirit: `contracts/boot.kofun`
-declares `Capabilities`, and `seed/router/router.kofun` proves a handler that
+Layers 1 and 2 exist in the repository today in spirit:
+`modules/router/contract/router.kofun` declares `Capabilities`, and the router
+core plus shell prove a handler that
 receives its one capability as an argument and is pure. Layer 3 is the new
 work this design adds. Layer 4 is somebody else's lane, in another repository.
 
@@ -92,7 +93,7 @@ once, sharply, borrowing the formulation from the F# lab this design draws on:
 > constructor of a closed sum. "The database connection failed" is a system
 > failure — an `Err`. A rejected upgrade is not an error; it is an answer.
 
-`RouteResult` in `contracts/boot.kofun` already follows this: `NotFound`,
+`RouteResult` in `modules/router/contract/router.kofun` already follows this: `NotFound`,
 `MethodNotAllowed(allowed)` and `PayloadTooLarge(limit, observed)` are
 *answers*, each carrying what was observed, and none of them is an `Err`.
 

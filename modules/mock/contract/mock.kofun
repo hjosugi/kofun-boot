@@ -1,0 +1,55 @@
+# The canonical contract of the mock bounded context.
+#
+# This surface is deliberately richer than the executable Stage 2 seed in
+# ../core/mock.kofun: a resource is a List and commands are named values.  The
+# seed projects the same decisions into fixed slots and integer operation
+# codes, without changing the domain outcome.  tests/boot/check.sh pins that
+# correspondence constructor by constructor.
+#
+# Domain refusal is an answer, not a system error.  MockOutcome is therefore
+# a closed sum and every constructor carries what the rule observed.  A full
+# resource names its capacity; a missing item names its id.  Disk or socket
+# failure would be Result.Err at an adapter boundary and does not belong here.
+
+let MOCK_CONTRACT_VERSION = 1
+
+type MockResource = {
+    id: Int,
+    value: Int,
+}
+
+type MockCommand =
+    | ListResources
+    | ShowResource(id: Int)
+    | CreateResource(value: Int)
+    | UpdateResource(id: Int, value: Int)
+    | DeleteResource(id: Int)
+
+type MockStore = {
+    resources: List[MockResource],
+    next_id: Int,
+    capacity: Int,
+}
+
+type MockOutcome =
+    | Collection(live: Int)
+    | Item(value: Int)
+    | Created(id: Int)
+    | Updated(id: Int)
+    | Deleted(id: Int)
+    | Missing(id: Int)
+    | Full(capacity: Int)
+
+type MockTransition = {
+    store: MockStore,
+    outcome: MockOutcome,
+}
+
+# A pure aggregate transition: the same store and command always produce the
+# same new store and observed outcome.  The shell owns persistence and I/O.
+fn mock_apply(
+    store: MockStore,
+    command: MockCommand
+) -> MockTransition {
+    ...
+}

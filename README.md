@@ -51,9 +51,10 @@ the decisions on both backends, byte-for-byte.
 
 ### The router — contract-first dispatch
 
-`seed/router/` compiles a route table at build time and dispatches with a
-comparison count independent of the request, so the same input can never take
-two paths. Failures are a closed sum that carries what was observed:
+`modules/router/` owns its contract, core, shell, and tests. Its core compiles
+a route table at build time and dispatches with a comparison count independent
+of the request, so the same input can never take two paths. Failures are a
+closed sum that carries what was observed:
 
 ```
 GET  /hello   → Matched(handler 1)
@@ -68,8 +69,9 @@ watching the refusal change.
 
 ### The mock resource — json-server's five minutes, replayable
 
-`seed/mock/` gives a full REST resource from a seed: list, show, create,
-update, delete. It edits nothing. `apply : Store -> Operation -> StoreStep`
+`modules/mock/` owns a second bounded context and gives a full REST resource
+from a seed: list, show, create, update, delete. It edits nothing.
+`apply : Store -> Operation -> StoreStep`
 returns the resource *and* what happened, and there is no other way to obtain
 the next store, so a session is a fold.
 
@@ -77,6 +79,24 @@ Three properties follow that a file-mutating mock cannot offer: the same seed
 and the same requests **replay byte-identically**; a test can assert the
 resource *between* two requests; and `POST` allocates from a counter carried
 in the value, so ids are deterministic with **no clock and no entropy**.
+
+Its domain answer is `MockOutcome`, a closed sum shared exactly between the
+rich canonical contract and the executable seed. `Missing(id)` carries the id
+that was absent and `Full(capacity)` carries the bound that was reached. These
+are valid business refusals, not exceptions; adapter failures remain system
+errors at the shell boundary.
+
+### Modules — the bounded context owns its whole vertical
+
+Every directory under `modules/` must own `contract/`, `core/`, `shell/`, and
+`tests/`. The architecture gate discovers modules from the filesystem; adding
+a bounded context does not require adding its name to a test. Another module
+may name only `modules/<name>/contract` — a direct reference to its core,
+shell, or tests fails with the offending source path and line.
+
+`tests/architecture/check.sh` proves both directions on every run: it adds an
+`orders` module without editing `router` or `mock`, then injects an import of
+`router/core` and requires the gate to reject the exact line.
 
 ### Replay — a recorded session, run again
 
@@ -167,12 +187,13 @@ number quoted; hand-editing the OpenAPI document fails with the diff.
 
 | path | what |
 |---|---|
-| `contracts/` | canonical surfaces ahead of the compiler, pinned by gates; the generated OpenAPI document |
-| `seed/router/` | the dispatcher: core, shell, unit suite, golden |
-| `seed/mock/` | the REST resource: core, shell, unit suite, recorded trace |
-| `scripts/` | `dev.sh`, `new.sh`, `build-seed.sh`, `openapi.sh`, `client-ts.sh`, `trace.sh` |
+| `modules/router/` | router bounded context: canonical contract, core, shell, unit suite, golden |
+| `modules/mock/` | mock bounded context: canonical contract, core, shell, unit suite |
+| `contracts/` | generated/projected public artifacts: OpenAPI, typed client, replay trace |
+| `scripts/` | developer loop, module gate/test adapter, build and projection commands |
+| `tests/architecture/` | data-driven module ownership and contract-only dependency gate, tested both ways |
 | `tests/client/` | one call that must compile, two that must not |
-| `tests/boot/check.sh` | the gate: boundary, contract, dispatch decisions, projection, determinism |
+| `tests/boot/check.sh` | contract/seed correspondence, dispatch decisions, projection, determinism |
 | `tests/integration/serve.sh` | a real server on a real socket |
 | `tests/scaffold/check.sh` | `boot new`'s output, generated and gated every run |
 | `tests/release/check.sh` | the release gate: the declared unmeasured set must match the pillar table |

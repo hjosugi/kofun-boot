@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-# Concatenate the functional core with the imperative shell and build.
+# Concatenate one module's functional core with its imperative shell and build.
 #
 # The language's executable slice has no module imports, so a two-layer
 # application is assembled the way framework/http assembles its own: text
@@ -24,11 +24,23 @@ if test "$#" -gt 0; then shift; fi
 mkdir -p "$(dirname -- "$OUT")"
 UNIT="$(dirname -- "$OUT")/$SEED.unit.kofun"
 
-test -f "$ROOT/seed/$SEED/core.kofun" ||
+MODULE="$ROOT/modules/$SEED"
+test -d "$MODULE" ||
     { printf 'build-seed: no seed named %s\n' "$SEED" >&2; exit 2; }
-cat "$ROOT/seed/$SEED/core.kofun" >"$UNIT"
-printf '\n' >>"$UNIT"
-cat "$ROOT/seed/$SEED/shell.kofun" >>"$UNIT"
+
+: >"$UNIT"
+for source in "$MODULE"/core/*.kofun; do
+    test -f "$source" ||
+        { printf 'build-seed: %s has no core source\n' "$SEED" >&2; exit 2; }
+    cat "$source" >>"$UNIT"
+    printf '\n' >>"$UNIT"
+done
+for source in "$MODULE"/shell/*.kofun; do
+    test -f "$source" ||
+        { printf 'build-seed: %s has no shell source\n' "$SEED" >&2; exit 2; }
+    cat "$source" >>"$UNIT"
+    printf '\n' >>"$UNIT"
+done
 
 # stdout belongs to this script: exactly one line, the path that was built.
 "$KOFUN" build "$UNIT" -o "$OUT" "$@" >/dev/null

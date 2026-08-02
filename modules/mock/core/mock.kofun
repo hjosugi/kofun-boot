@@ -22,9 +22,9 @@
 # with comments stripped and enforces both.
 #
 # Bounded to four rows, the way the language's own fixtures bound themselves.
-# contracts/mock.kofun holds the canonical surface — a List of records, Text
-# fields, JSON bodies — and this projects it into the Stage 2 slice without
-# changing one decision.
+# ../contract/mock.kofun holds the canonical surface — a List of records and
+# named commands — and this projects it into the Stage 2 slice without
+# changing one decision. The gate compares the closed outcome blocks exactly.
 
 # ------------------------------------------------------------- constants
 

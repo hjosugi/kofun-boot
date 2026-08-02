@@ -46,8 +46,10 @@ sh tests/research/check.sh
   commit pin、要約、設計判断である。
 - 外部benchmarkの数値はkofun-bootの性能値ではない。kofun-bootの比較値は同じbox、
   同じhandlerをL5 gateで測るまで未測定である。
-- Outbox/Inbox、module別database schema、event sourcingは調査対象であり、現時点で
-  全てが実装済みという意味ではない。各文書のadopt/adapt/deferを参照する。
+- moduleの縦割りownership、contract-only dependency gate、closed business outcome
+  seedは実装済みである。Outbox/Inbox、module別database schema、event sourcingは
+  引き続き調査・設計段階であり、全てが実装済みという意味ではない。各文書の
+  adopt/adapt/deferを参照する。
 
 ## License
 

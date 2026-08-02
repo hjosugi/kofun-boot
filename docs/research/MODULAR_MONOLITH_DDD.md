@@ -161,10 +161,10 @@ assertionは `ApplicationAssembly` を参照する。Domain→Infrastructure rul
 lineをそのまま報告する。gate追加時は必ず一度違反を注入し、期待する名前で失敗する
 ことも確認する。
 
-## 採用するmodule layout
+## 採用したmodule layout
 
-Issue #36 の目標layoutは次とする。`router` と `mock` がこの形へ実際に移動してgateを
-通るまで、layout決定を完了とはしない。
+Issue #36 で次のlayoutを採用した。`router` と `mock` はこの形へ実際に移動し、
+data-driven gateを通る。調査上の推奨に留めず、既存codeが収まることまで確認した。
 
 ```text
 modules/
@@ -187,6 +187,16 @@ tests/
 module内の小規模な実装をさらにDomain/Application/Infrastructureというdirectoryへ
 分けることは要求しない。縦の所有権とcore/shell ruleが守られている限り、水平layer
 を増やすほどnavigation costが上がるためである。
+
+実装evidenceは次の通りである。
+
+- `scripts/check-modules.sh` はmodule名をhard-codeせず、全moduleの4 directoryを検査する。
+- `tests/architecture/check.sh` は第三の `orders` moduleを追加し、既存moduleを編集せず
+  PASSすることを確認する。
+- 同testは `../../router/core/router` を注入し、違反source、line、許可される
+  `../../router/contract` をdiagnosticが示すことを確認する。
+- `modules/mock/contract/mock.kofun` と実行可能seedの `MockOutcome` blockはbyte単位で
+  比較され、全constructorが観測値を保持する。
 
 ## 採用・適応・不採用
 
