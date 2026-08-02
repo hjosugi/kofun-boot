@@ -61,3 +61,15 @@ stories.
 - [#12](https://github.com/hjosugi/kofun-boot/issues/12) serve: build and smoke the vendored `framework/http` server on CI
 - [#13](https://github.com/hjosugi/kofun-boot/issues/13) contract: path captures in the seed, read by the gate
 - [#14](https://github.com/hjosugi/kofun-boot/issues/14) capabilities: the FCIS gate — core modules cannot name a capability
+- [#31](https://github.com/hjosugi/kofun-boot/issues/31) effects: the `Cmd`/`Sub` canonical contract, pinned at its boundary, with a seed that emits a trace
+- [#33](https://github.com/hjosugi/kofun-boot/issues/33) capabilities: the granted set as a printed, diffable manifest the gate reads from the binary
+- [#29](https://github.com/hjosugi/kofun-boot/issues/29) desktop: IME and accessibility are gates — no number is recorded before they pass
+- [#30](https://github.com/hjosugi/kofun-boot/issues/30) desktop: decompose the bar — two of the four webview costs are the language's win, not the renderer's
+
+Blocked on a filed dependency, not on refinement:
+
+- [#32](https://github.com/hjosugi/kofun-boot/issues/32) replay: the trace format is the `Cmd`/`Msg` sequence — blocked by [#31](https://github.com/hjosugi/kofun-boot/issues/31)
+
+## Waiting on a decision
+
+- [#28](https://github.com/hjosugi/kofun-boot/issues/28) **is the view a shared ADT, or platform-specific?** [R7 #22](https://github.com/hjosugi/kofun-boot/issues/22) says platform-specific; the render-backend dossier argues that this decides whether L9's "lighter than Tauri" is a claim about a webview app or a native one — and that the decision is cheap now and expensive after the first renderer exists. Only the decision owner may resolve it.
