@@ -20,7 +20,7 @@ Everything below follows from that sentence.
 ```sh
 git clone --recurse-submodules https://github.com/hjosugi/kofun-boot
 cd kofun-boot
-sh scripts/dev.sh                      # 31 unit tests, a build, a golden check — about a second
+sh scripts/dev.sh                      # 34 unit tests, a build, a golden check — about a second
 sh scripts/new.sh ../my-app --name my-app   # a project that already has the boundary
 cd ../my-app && sh tests/check.sh      # its own gate: boundary, suite, golden, determinism
 ```
@@ -116,6 +116,18 @@ Reference and C11 backends emit identical bytes twice, under a hostile time
 zone and locale, and under `env -i`; emitted C is checked for ambient clock,
 environment, file, and socket reach.
 
+The structured effect trace is the same ten values, not a second log format:
+
+```sh
+sh scripts/effects-trace.sh record modules/effects/tests/effects.trace
+sh scripts/effects-trace.sh replay modules/effects/tests/effects.trace
+```
+
+Its v1 header pins SHA-256 of the canonical effect contract. Replay feeds each
+recorded `Msg` into the pure core and compares the next `Cmd`; a contract
+digest mismatch is refused before step 1, while a divergence names the step,
+fed `Msg`, expected `Cmd`, and emitted `Cmd`.
+
 ### Replay — a recorded session, run again
 
 There was no trace format to design. `apply` already returns the resource and
@@ -163,12 +175,12 @@ compiles.
 ## Testing, which is most of the reason to pick a framework
 
 **Unit tests need no server.** kotest pairs module-owned tests with their
-core, so tests call the core directly. Thirty-one of them run
+core, so tests call the core directly. Thirty-four of them run
 in about a second. Assertions accumulate rather than abort, so a broken change
 reports everything that is wrong at once instead of the first thing.
 
 ```
-Tests  31 passed (31 total, 3 suites)
+Tests  34 passed (34 total, 3 suites)
 ```
 
 **Integration tests use a real socket.** `tests/integration/serve.sh` builds the
@@ -207,7 +219,7 @@ number quoted; hand-editing the OpenAPI document fails with the diff.
 |---|---|
 | `modules/router/` | router bounded context: canonical contract, core, shell, unit suite, golden |
 | `modules/mock/` | mock bounded context: canonical contract, core, shell, unit suite |
-| `modules/effects/` | Cmd/Sub/Msg boundary: canonical contract, Stage 2 projection, shell trace, unit suite |
+| `modules/effects/` | Cmd/Sub/Msg boundary and trace v1: canonical contracts, Stage 2 replay core, shell, fixtures, unit suite |
 | `contracts/` | generated/projected public artifacts: OpenAPI, typed client, replay trace |
 | `scripts/` | developer loop, module gate/test adapter, build and projection commands |
 | `tests/architecture/` | data-driven module ownership and contract-only dependency gate, tested both ways |

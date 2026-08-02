@@ -3,7 +3,9 @@
 Decided 2026-08-02 from [`docs/research/EFFECT_SYSTEMS.md`](../research/EFFECT_SYSTEMS.md).
 This document is the reasoning; the canonical shapes belong to
 `modules/effects/contract/effects.kofun` and the executable evidence to the
-same bounded context's `core/`, `shell/`, and `tests/` directories.
+same bounded context's `core/`, `shell/`, and `tests/` directories. Trace v1
+is canonical in `modules/effects/contract/trace.kofun` and executable in
+`modules/effects/core/trace.kofun`.
 
 ## The decision in one paragraph
 
@@ -183,6 +185,14 @@ the program's own output. Here the trace is the program's output. The existing
 gate discipline — run twice, `cmp`; run under `TZ=Pacific/Kiritimati`, a
 hostile locale and `env -i`, `cmp` again — applies to it unchanged.
 
+That statement is executable now. `scripts/effects-trace.sh record` writes ten
+rows with `step source effect argument continuation message observed` and a
+header naming `kofun-boot.effects-trace/v1` plus SHA-256 of the canonical
+`effects.kofun`. Replay refuses a mismatched contract digest before evaluating
+a step. It then calls `replay_initial`, feeds each recorded message to
+`replay_after`, and compares the next emitted command. The first mismatch
+reports the step, fed message, expected command and emitted command.
+
 ## Layer 4 — effect rows, when they land
 
 Kofun's type-system document names effects and row polymorphism as targets.
@@ -203,6 +213,7 @@ When they arrive:
 |---|---|
 | a core module cannot perform an effect | FCIS gate: comments stripped, capability names greped, as `scripts/check-modules.sh` and `tests/boot/check.sh` do |
 | every effect decision is byte-stable | `modules/effects/tests/effects.stdout`, both backends, then hostile `TZ`, locale and `env -i` |
+| a recorded effect run replays into the core | `modules/effects/tests/effects.trace`; record twice, both backends, hostile environment, digest refusal and corrupted-`Msg` divergence in `tests/boot/check.sh` |
 | the same core runs under any shell | one core, interpreted by the server shell and the desktop shell, both gated on the same trace |
 | an effect cannot outlive its scope | blocked on kofun #898; the gate lands with the surface |
 | the granted capability set is auditable | the shell prints the effective record; the gate reads the printed record, not the source |

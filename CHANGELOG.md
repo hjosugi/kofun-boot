@@ -13,6 +13,54 @@ the `Unmeasured at this release` section added as a local requirement.
 
 Nothing yet.
 
+## [0.4.0] - 2026-08-02
+
+Effect trace v1 now records the program's own `Cmd`/`Msg` values and replays
+them into the pure core. It is not a live-server capture, scheduler, or trace
+diff UI.
+
+### Added
+
+- **Canonical trace contract** —
+  `modules/effects/contract/trace.kofun` versions the format, pins the SHA-256
+  of `effects.kofun`, and makes digest refusal and replay divergence closed
+  results.
+- **Executable replay core** — `replay_initial` emits the initial command and
+  `replay_after` consumes each recorded message to emit the next command. A
+  corrupted message therefore changes a decision instead of being ignored.
+- **Record/replay command** — `scripts/effects-trace.sh` writes the ten-step
+  fixture and replays it on both the reference and C11 backends. Divergence
+  reports step, fed `Msg`, expected `Cmd`, and emitted `Cmd`.
+- **Updated research pack** — the deterministic ZIP includes the implemented
+  trace-v1 evidence and has SHA-256
+  `25c609ec468f888b13c4a6c9de911974dedc2a96c010ed203c4ac37098ce8980`.
+
+### Gates
+
+- 34/34 module-owned tests pass across three suites.
+- Record output is byte-identical across two C11 runs, the reference backend,
+  hostile time zone and locale, and `env -i`.
+- A changed contract digest is refused before replay by a named diagnostic.
+- A deliberately corrupted recorded message exits non-zero and names all four
+  divergence fields; both destructive cases run in `tests/boot/check.sh`.
+
+### Unmeasured at this release
+
+- Speed — L5; the benchmark harness exists and refuses to produce a number it
+  does not trust, but no baseline has been recorded.
+- Desktop lighter than Tauri — L9; blocked on the language's wasm32 activation
+  lanes, and gated behind IME and accessibility conformance before any number
+  is recorded ([#29](https://github.com/hjosugi/kofun-boot/issues/29)).
+
+### Known boundaries
+
+- Trace capture from a live server remains in L2; this release records the
+  bounded effect run.
+- There is no scheduler, TEA loop, trace-diff UX, live interpreter, or scoped
+  spawn in this release.
+- The canonical trace uses `Bytes`, `List`, and rich sums ahead of the compiler;
+  the executable projection is the current fixed-rank integer slice.
+
 ## [0.3.0] - 2026-08-02
 
 The effect boundary is now an executable bounded context rather than a design
@@ -207,7 +255,8 @@ is blocked on the lane named beside it.
 - `0.x` makes no API stability promise. Minors may break the contract surface;
   this file will say so when they do.
 
-[Unreleased]: https://github.com/hjosugi/kofun-boot/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/hjosugi/kofun-boot/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/hjosugi/kofun-boot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/hjosugi/kofun-boot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/hjosugi/kofun-boot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hjosugi/kofun-boot/releases/tag/v0.1.0

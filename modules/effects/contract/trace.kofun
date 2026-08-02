@@ -1,0 +1,57 @@
+# kofun-boot effect trace v1 — canonical contract.
+#
+# A trace is not an interpreter log. It is the sequence of Cmd values the pure
+# core emitted and Msg values the shell fed back. Replay starts the same core,
+# feeds it the recorded messages, and compares the commands it emits.
+#
+# This surface is deliberately ahead of the current Stage 2 compiler. `Bytes`,
+# `List`, records containing rich sums, and multi-payload result constructors
+# do not lower yet. tests/boot/check.sh pins that E2S02 boundary while the
+# executable projection in ../core/trace.kofun keeps the decisions runnable.
+#
+# The serialised header uses the stable name `kofun-boot.effects-trace/v1` and
+# carries SHA-256 of effects.kofun. A digest mismatch is Refused before any
+# step is replayed. A divergence is data: it carries the step, the Msg that was
+# fed, the expected Cmd from the fixture, and the Cmd the core emitted.
+
+type TraceVersion =
+    | EffectTraceV1
+
+type ContractDigest = {
+    sha256: Bytes,
+}
+
+type TraceStep = {
+    step: Int,
+    command: Cmd,
+    message: Msg,
+}
+
+type EffectTrace = {
+    version: TraceVersion,
+    contract_digest: ContractDigest,
+    steps: List[TraceStep],
+}
+
+type ReplayDivergence = {
+    step: Int,
+    fed_message: Msg,
+    expected_command: Cmd,
+    emitted_command: Cmd,
+}
+
+type ReplayResult =
+    | Replayed(steps: Int)
+    | Refused(recorded: ContractDigest, current: ContractDigest)
+    | Diverged(at: ReplayDivergence)
+
+fn boot_record_effect_trace(
+    commands: List[Cmd],
+    messages: List[Msg],
+    contract_digest: ContractDigest
+) -> EffectTrace
+
+fn boot_replay_effect_trace(
+    trace: EffectTrace,
+    current_digest: ContractDigest
+) -> ReplayResult

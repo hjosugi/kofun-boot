@@ -229,13 +229,21 @@ test -z "$dupes" || fail "duplicate (method, path) pair in the table: $dupes"
 
 effects_module=${EFFECTS_MODULE:-"$ROOT/modules/effects"}
 effects_contract="$effects_module/contract/effects.kofun"
+effects_trace_contract="$effects_module/contract/trace.kofun"
 effects_core="$effects_module/core/effects.kofun"
+effects_replay_core="$effects_module/core/trace.kofun"
 effects_shell="$effects_module/shell/effects.kofun"
 effects_expected="$effects_module/tests/effects.stdout"
+effects_trace_expected="$effects_module/tests/effects.trace"
+effects_trace_tool="$ROOT/scripts/effects-trace.sh"
 test -f "$effects_contract" || fail 'effects canonical contract is missing'
+test -f "$effects_trace_contract" || fail 'effects trace v1 contract is missing'
 test -f "$effects_core" || fail 'effects core is missing'
+test -f "$effects_replay_core" || fail 'effects replay core is missing'
 test -f "$effects_shell" || fail 'effects shell is missing'
 test -f "$effects_expected" || fail 'effects trace golden is missing'
+test -f "$effects_trace_expected" || fail 'effects structured trace fixture is missing'
+test -x "$effects_trace_tool" || fail 'effects record/replay tool is missing'
 
 for declaration in \
     'type Cmd =' \
@@ -332,6 +340,31 @@ require_line 'effects canonical surface did not stop at the documented boundary'
     'error[E2S02]: expected top-level `fn` or `type`' \
     "$WORK/effects.contract.stderr"
 
+for declaration in \
+    'type TraceVersion =' \
+    'type ContractDigest = {' \
+    'type TraceStep = {' \
+    'type EffectTrace = {' \
+    'type ReplayDivergence = {' \
+    'type ReplayResult =' \
+    'fn boot_record_effect_trace(' \
+    'fn boot_replay_effect_trace('
+do
+    require_line 'effects trace v1 canonical surface lost a declaration' \
+        "$declaration" "$effects_trace_contract"
+done
+require_line 'effects trace format version moved without a new version' \
+    'kofun-boot.effects-trace/v1' "$effects_trace_contract"
+if "$KOFUN" check "$effects_trace_contract" \
+    >"$WORK/effects.trace-contract.stdout" \
+    2>"$WORK/effects.trace-contract.stderr"
+then
+    fail 'effects trace canonical surface unexpectedly claimed executable codegen'
+fi
+require_line 'effects trace canonical surface did not stop at its documented boundary' \
+    'error[E2S32]: record `ContractDigest` has a field type outside the Stage 2 Int/Bool slice' \
+    "$WORK/effects.trace-contract.stderr"
+
 # The executable projection carries the same extension and continuation
 # properties. Pinning the rich contract alone would let the seed silently
 # narrow it while the prose stayed correct.
@@ -349,8 +382,11 @@ do
 done
 
 effects_seed="$WORK/effects.unit.kofun"
-cat "$effects_core" >"$effects_seed"
-printf '\n' >>"$effects_seed"
+: >"$effects_seed"
+for source in "$effects_module"/core/*.kofun; do
+    cat "$source" >>"$effects_seed"
+    printf '\n' >>"$effects_seed"
+done
 cat "$effects_shell" >>"$effects_seed"
 sed 's/[[:space:]]*#.*$//' "$effects_seed" >"$WORK/effects.code"
 if grep -qE 'clock_gettime|gettimeofday|getenv|fopen|socket\(|__linux_syscall|import ' \
@@ -435,6 +471,66 @@ cmp "$effects_expected" "$WORK/effects.backend.stdout" ||
 
 printf 'boot: Cmd/Sub continuations and total Msg answers are pinned: PASS\n'
 printf 'boot: effects agree on both backends under hostile TZ, locale, env -i: PASS\n'
+
+if test "${EFFECTS_SKIP_BREAK_TEST:-0}" != 1; then
+    EFFECTS_TRACE_RUNNER=c11 sh "$effects_trace_tool" record \
+        "$WORK/effects.trace.c11" >"$WORK/effects.trace-record-c11.log"
+    EFFECTS_TRACE_RUNNER=c11 sh "$effects_trace_tool" record \
+        "$WORK/effects.trace.second" >"$WORK/effects.trace-record-second.log"
+    EFFECTS_TRACE_RUNNER=reference sh "$effects_trace_tool" record \
+        "$WORK/effects.trace.reference" >"$WORK/effects.trace-record-reference.log"
+    TZ=Pacific/Kiritimati LC_ALL=C LANG=C EFFECTS_TRACE_RUNNER=c11 \
+        sh "$effects_trace_tool" record "$WORK/effects.trace.hostile" \
+        >"$WORK/effects.trace-record-hostile.log"
+    env -i PATH="$PATH" EFFECTS_TRACE_RUNNER=c11 \
+        sh "$effects_trace_tool" record "$WORK/effects.trace.bare" \
+        >"$WORK/effects.trace-record-bare.log"
+    for recorded in \
+        "$WORK/effects.trace.second" \
+        "$WORK/effects.trace.reference" \
+        "$WORK/effects.trace.hostile" \
+        "$WORK/effects.trace.bare"
+    do
+        cmp "$WORK/effects.trace.c11" "$recorded" ||
+            fail "structured effect trace changed across a replay environment: $recorded"
+    done
+    cmp "$effects_trace_expected" "$WORK/effects.trace.c11" ||
+        fail 'committed effect trace v1 no longer matches record mode'
+    sh "$effects_trace_tool" replay "$effects_trace_expected" \
+        >"$WORK/effects.trace-replay.log" 2>&1 ||
+        fail "effect trace replay failed: $(cat "$WORK/effects.trace-replay.log")"
+    require_line 'effect trace replay did not name both backends' \
+        'replayed byte-identically on reference and C11' \
+        "$WORK/effects.trace-replay.log"
+
+    sed 's/^# contract-sha256: .*/# contract-sha256: 0000000000000000000000000000000000000000000000000000000000000000/' \
+        "$effects_trace_expected" >"$WORK/effects.trace-wrong-contract"
+    if sh "$effects_trace_tool" replay "$WORK/effects.trace-wrong-contract" \
+        >"$WORK/effects.trace-wrong-contract.log" 2>&1
+    then
+        fail 'a trace recorded against another effect contract was accepted'
+    fi
+    require_line 'contract mismatch was not refused by name' \
+        'contract digest mismatch:' "$WORK/effects.trace-wrong-contract.log"
+
+    sed 's/^3[[:space:]]\+1[[:space:]]\+2[[:space:]]\+9001[[:space:]]\+41[[:space:]]\+1[[:space:]]\+200$/3\t1\t2\t9001\t41\t2\t200/' \
+        "$effects_trace_expected" >"$WORK/effects.trace-corrupt-msg"
+    if sh "$effects_trace_tool" replay "$WORK/effects.trace-corrupt-msg" \
+        >"$WORK/effects.trace-corrupt-msg.log" 2>&1
+    then
+        fail 'a corrupted recorded Msg replayed successfully'
+    fi
+    for diagnostic in \
+        'replay diverged at step 4' \
+        'fed Msg:' \
+        'expected Cmd:' \
+        'emitted Cmd:'
+    do
+        require_line 'corrupted Msg divergence lost a required field' \
+            "$diagnostic" "$WORK/effects.trace-corrupt-msg.log"
+    done
+    printf 'boot: effect trace v1 records and replays; digest and Msg breaks fail by name: PASS\n'
+fi
 
 # Do not merely say these checks are structural: break each property in an
 # isolated module copy and require this same gate to reject it by name. The

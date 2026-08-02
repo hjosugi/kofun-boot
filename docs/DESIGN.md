@@ -102,9 +102,10 @@ lane builds on it:
 
 ## 4. Deterministic replay as the test story
 
-Because every dependency is a value, a recorded run is a value too. The replay
-lane owns a trace format: the capability record's every answer (clock reads,
-bytes served, network events), recorded once, replayed byte-identically. The
+Because every effect is a value, a recorded run is a value too. The effect
+trace is the sequence of `Cmd`s the core emitted and `Msg`s the shell fed
+back, recorded once and replayed by feeding those messages into the same core.
+That records decisions as well as answers, without instrumentation. The
 gate discipline comes straight from Kofun's tzdb gate: run twice and `cmp`,
 then run under `TZ=Pacific/Kiritimati`, a `tr_TR` locale, and `env -i`, and
 `cmp` again. A framework whose tests pass only in the CI image's locale has an
