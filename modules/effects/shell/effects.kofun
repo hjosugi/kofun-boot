@@ -15,6 +15,14 @@ fn emit_effect_step(step: EffectStep) -> Int {
 }
 
 fn main() -> Int {
+    # Keep the replay projection in the assembled production unit, not only in
+    # tests. These pure probes emit nothing; record/replay supplies all later
+    # messages through the same functions.
+    let replay_start: ReplayCmd = replay_initial()
+    if replay_start.accepted == 0 { return 1 }
+    let replay_second: ReplayCmd = replay_after(1, msg_none(), 0)
+    if replay_second.accepted == 0 { return 1 }
+
     # No effect, then a bounded two-command batch.
     emit_effect_step(trace_none())
     emit_effect_step(trace_batch(2))

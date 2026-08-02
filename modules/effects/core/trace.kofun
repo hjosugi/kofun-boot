@@ -1,0 +1,150 @@
+# Executable Stage 2 replay projection for effect trace v1.
+#
+# The recorded row contains the Cmd the core emitted and the Msg the shell fed
+# back. replay_initial emits row 1 without an input. replay_after consumes the
+# previous row's Msg and emits the next Cmd. Nothing reads a file, clock, locale
+# or environment here; the host adapter only serialises values around this
+# pure transition.
+
+type ReplayCmd = {
+    accepted: Int,
+    source: Int,
+    effect: Int,
+    argument: Int,
+    continuation: Int,
+}
+
+fn replay_cmd(
+    source: Int,
+    effect: Int,
+    argument: Int,
+    continuation: Int
+) -> ReplayCmd {
+    let command: ReplayCmd = ReplayCmd(
+        accepted: 1,
+        source: source,
+        effect: effect,
+        argument: argument,
+        continuation: continuation
+    )
+    return command
+}
+
+fn replay_rejected() -> ReplayCmd {
+    let command: ReplayCmd = ReplayCmd(
+        accepted: 0,
+        source: 0,
+        effect: 0,
+        argument: 0,
+        continuation: 0
+    )
+    return command
+}
+
+fn replay_initial() -> ReplayCmd {
+    let command: ReplayCmd = replay_cmd(source_cmd(), cmd_none(), 0, 0)
+    return command
+}
+
+# Return the command following `previous_step` only when the supplied Msg is
+# exactly the value that was recorded for that step. A corrupted Msg therefore
+# cannot be ignored: it changes the next emitted command to a rejected value,
+# which the host reports as the first divergence.
+fn replay_after(
+    previous_step: Int,
+    fed_message: Int,
+    fed_observed: Int
+) -> ReplayCmd {
+    if previous_step == 1 {
+        if fed_message == msg_none() {
+            if fed_observed == 0 {
+                let command: ReplayCmd = replay_cmd(source_cmd(), cmd_batch(), 2, 0)
+                return command
+            }
+        }
+        let rejected: ReplayCmd = replay_rejected()
+        return rejected
+    }
+    if previous_step == 2 {
+        if fed_message == msg_none() {
+            if fed_observed == 0 {
+                let command: ReplayCmd = replay_cmd(source_cmd(), cmd_http_request(), 9001, 41)
+                return command
+            }
+        }
+        let rejected: ReplayCmd = replay_rejected()
+        return rejected
+    }
+    if previous_step == 3 {
+        if fed_message == msg_http_completed() {
+            if fed_observed == 200 {
+                let command: ReplayCmd = replay_cmd(source_cmd(), cmd_http_request(), 9002, 42)
+                return command
+            }
+        }
+        let rejected: ReplayCmd = replay_rejected()
+        return rejected
+    }
+    if previous_step == 4 {
+        if fed_message == msg_http_timed_out() {
+            if fed_observed == 1000 {
+                let command: ReplayCmd = replay_cmd(source_sub(), sub_every(), 5000, 51)
+                return command
+            }
+        }
+        let rejected: ReplayCmd = replay_rejected()
+        return rejected
+    }
+    if previous_step == 5 {
+        if fed_message == msg_tick() {
+            if fed_observed == 1700000000 {
+                let command: ReplayCmd = replay_cmd(source_cmd(), cmd_read_clock(), 0, 43)
+                return command
+            }
+        }
+        let rejected: ReplayCmd = replay_rejected()
+        return rejected
+    }
+    if previous_step == 6 {
+        if fed_message == msg_clock_read() {
+            if fed_observed == 1700000001 {
+                let command: ReplayCmd = replay_cmd(source_cmd(), cmd_persist(), 7001, 44)
+                return command
+            }
+        }
+        let rejected: ReplayCmd = replay_rejected()
+        return rejected
+    }
+    if previous_step == 7 {
+        if fed_message == msg_persisted() {
+            if fed_observed == 7001 {
+                let command: ReplayCmd = replay_cmd(source_cmd(), cmd_custom(), 8001, 45)
+                return command
+            }
+        }
+        let rejected: ReplayCmd = replay_rejected()
+        return rejected
+    }
+    if previous_step == 8 {
+        if fed_message == msg_custom_completed() {
+            if fed_observed == 8001 {
+                let command: ReplayCmd = replay_cmd(source_sub(), sub_signal(), 9, 52)
+                return command
+            }
+        }
+        let rejected: ReplayCmd = replay_rejected()
+        return rejected
+    }
+    if previous_step == 9 {
+        if fed_message == msg_signal_received() {
+            if fed_observed == 9 {
+                let command: ReplayCmd = replay_cmd(source_sub(), sub_custom(), 8002, 53)
+                return command
+            }
+        }
+        let rejected: ReplayCmd = replay_rejected()
+        return rejected
+    }
+    let rejected: ReplayCmd = replay_rejected()
+    return rejected
+}

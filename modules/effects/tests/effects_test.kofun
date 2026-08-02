@@ -96,3 +96,36 @@ fn test_every_http_observation_produces_a_message() -> Int {
     failures = failures + expect_eq_int(late.continuation, 71)
     return failures
 }
+
+fn test_replay_starts_with_the_recorded_initial_command() -> Int {
+    let command: ReplayCmd = replay_initial()
+    let mut failures = 0
+    failures = failures + expect_eq_int(command.accepted, 1)
+    failures = failures + expect_eq_int(command.source, source_cmd())
+    failures = failures + expect_eq_int(command.effect, cmd_none())
+    failures = failures + expect_eq_int(command.argument, 0)
+    failures = failures + expect_eq_int(command.continuation, 0)
+    return failures
+}
+
+fn test_replay_feeds_a_message_to_emit_the_next_command() -> Int {
+    let command: ReplayCmd = replay_after(3, msg_http_completed(), 200)
+    let mut failures = 0
+    failures = failures + expect_eq_int(command.accepted, 1)
+    failures = failures + expect_eq_int(command.source, source_cmd())
+    failures = failures + expect_eq_int(command.effect, cmd_http_request())
+    failures = failures + expect_eq_int(command.argument, 9002)
+    failures = failures + expect_eq_int(command.continuation, 42)
+    return failures
+}
+
+fn test_replay_cannot_ignore_a_corrupted_message() -> Int {
+    let command: ReplayCmd = replay_after(3, msg_http_timed_out(), 200)
+    let mut failures = 0
+    failures = failures + expect_eq_int(command.accepted, 0)
+    failures = failures + expect_eq_int(command.source, 0)
+    failures = failures + expect_eq_int(command.effect, 0)
+    failures = failures + expect_eq_int(command.argument, 0)
+    failures = failures + expect_eq_int(command.continuation, 0)
+    return failures
+}
