@@ -233,6 +233,10 @@ fi
 if grep -qE '^fn main' "$WORK/mock.code"; then
     fail 'the mock core owns an entry point; emission belongs to the shell'
 fi
+mock_shell="$ROOT/seed/mock/shell.kofun"
+test -f "$mock_shell" || fail 'the mock shell is missing'
+grep -qE '^fn main' "$mock_shell" ||
+    fail 'the mock shell no longer owns the entry point; the boundary has moved without being moved'
 if grep -qE 'clock_gettime|gettimeofday|getenv|fopen|socket\(|__linux_syscall|import ' \
     "$WORK/mock.code"
 then
@@ -273,6 +277,79 @@ test "$table_rows" -eq "$document_ops" ||
     fail "the table has $table_rows routes and the document has $document_ops operations"
 
 printf 'boot: the OpenAPI document is a projection of the table the router ran: PASS\n'
+
+# ------------------------------------------------------- the session trace
+#
+# The replay lane's whole claim: a recorded session runs again and produces
+# the same bytes. It is only meaningful because nothing in the core can reach
+# a clock, an id source, or a file — so if this ever diverges, something
+# ambient got in, and the divergence is the alarm rather than the noise.
+
+trace="$ROOT/contracts/session.trace"
+test -f "$trace" || fail 'the recorded session trace is missing'
+sh "$ROOT/scripts/trace.sh" replay "$trace" >"$WORK/replay.log" 2>&1 ||
+    fail "the recorded session did not replay:
+$(sed 's/^/    /' "$WORK/replay.log")"
+
+# A create after a delete must not reuse the freed id: two resources sharing
+# an id are indistinguishable in a replay, which would make every trace above
+# worth less than it looks. Read from the trace rather than trusted.
+freed=$(grep -v '^#' "$trace" | awk -F'\t' '$5 == 5 { print $6 }' | head -1)
+allocated=$(grep -v '^#' "$trace" | awk -F'\t' '$2 == 3 { print $6 }' | tail -1)
+test -n "$freed" && test -n "$allocated" ||
+    fail 'the trace no longer contains both a delete and a later create'
+test "$freed" != "$allocated" ||
+    fail "a create reused the id a delete freed ($freed); ids must be spent"
+
+printf 'boot: a recorded session replays byte-identically, and freed ids stay spent: PASS\n'
+
+# ------------------------------------------------ the TypeScript client
+#
+# Same projection path, and one claim the document cannot make: a wrong path
+# or a wrong method must be a compile error at the call site. Both directions
+# are checked, because a client that rejected everything would also make the
+# negative fixtures fail and would be worthless.
+
+recorded_client="$ROOT/contracts/client.ts"
+test -f "$recorded_client" || fail 'the generated client is missing'
+
+sh "$ROOT/scripts/client-ts.sh" "$WORK/router" >"$WORK/client.ts" ||
+    fail 'the client projection failed'
+cmp "$recorded_client" "$WORK/client.ts" ||
+    fail "the generated client no longer matches the table the router runs:
+$(diff "$recorded_client" "$WORK/client.ts" | head -12)"
+
+client_paths=$(grep -cE '^  \| "/' "$recorded_client")
+table_rows=$(sed -n '1,12p' "$expected" | paste - - - | wc -l)
+test "$client_paths" -eq "$table_rows" ||
+    fail "the table has $table_rows routes and the client exposes $client_paths"
+
+if command -v tsc >/dev/null 2>&1; then
+    mkdir -p "$WORK/ts"
+    cp "$recorded_client" "$WORK/ts/client.ts"
+    cp "$ROOT/tests/client/"*.ts "$WORK/ts/"
+    TSC_FLAGS='--noEmit --strict --target es2022 --lib es2022,dom --moduleResolution bundler --module esnext'
+
+    # shellcheck disable=SC2086
+    (cd "$WORK/ts" && tsc $TSC_FLAGS accepts.ts) >"$WORK/tsc.accept" 2>&1 ||
+        fail "a call the table allows did not type-check:
+$(sed 's/^/    /' "$WORK/tsc.accept")"
+
+    for fixture in rejects-wrong-method rejects-unknown-path; do
+        # shellcheck disable=SC2086
+        if (cd "$WORK/ts" && tsc $TSC_FLAGS "$fixture.ts") \
+            >"$WORK/tsc.$fixture" 2>&1
+        then
+            fail "$fixture.ts type-checked; the client accepts a call the table refuses"
+        fi
+        grep -q 'is not assignable to parameter of type' "$WORK/tsc.$fixture" ||
+            fail "$fixture.ts failed for the wrong reason:
+$(sed 's/^/    /' "$WORK/tsc.$fixture")"
+    done
+    printf 'boot: a wrong path or method is a compile error at the call site: PASS\n'
+else
+    printf 'boot: SKIP client type-check (tsc unavailable); projection still gated\n'
+fi
 
 printf 'boot: canonical contract pinned at its boundary: PASS\n'
 printf 'boot: fixed-rank dispatch, every closed outcome read by name: PASS\n'
