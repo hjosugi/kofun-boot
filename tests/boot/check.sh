@@ -82,10 +82,41 @@ require_line 'canonical surface did not stop at the documented boundary' \
 
 # ------------------------------------------------------------------ seed
 
-seed="$ROOT/seed/router/router.kofun"
+core="$ROOT/seed/router/core.kofun"
+shell="$ROOT/seed/router/shell.kofun"
 expected="$ROOT/seed/router/router.stdout"
-test -f "$seed" || fail 'seed source is missing'
+test -f "$core" || fail 'core source is missing'
+test -f "$shell" || fail 'shell source is missing'
 test -f "$expected" || fail 'seed golden is missing'
+
+# The core/shell boundary, enforced rather than described.
+#
+# Read with comments stripped: both files spend paragraphs explaining what the
+# core refuses to reach, and a grep over the whole text cannot tell that
+# explanation from a violation. The core may *name* the Capabilities type in a
+# signature — receiving a capability is the whole point — but it may not
+# construct one, because constructing is how a pure function would smuggle in
+# an authority nobody handed it.
+sed 's/[[:space:]]*#.*$//' "$core" >"$WORK/core.code"
+if grep -qE 'Capabilities\(' "$WORK/core.code"; then
+    printf '%s\n' \
+        'boot: FAIL: the functional core constructs a capability instead of receiving one:' >&2
+    grep -nE 'Capabilities\(' "$WORK/core.code" >&2
+    exit 1
+fi
+if grep -qE '^fn main' "$WORK/core.code"; then
+    fail 'the functional core owns an entry point; emission belongs to the shell'
+fi
+if ! grep -qE 'Capabilities\(' "$(sed 's/[[:space:]]*#.*$//' "$shell" >"$WORK/shell.code"; echo "$WORK/shell.code")"; then
+    fail 'the shell no longer builds the capability record; the boundary has moved without being moved'
+fi
+
+# The seed the rest of this gate exercises is the two layers concatenated, the
+# way scripts/build-seed.sh assembles them for a developer.
+seed="$WORK/router.unit.kofun"
+cat "$core" >"$seed"
+printf '\n' >>"$seed"
+cat "$shell" >>"$seed"
 
 # Nothing ambient, asserted against code rather than prose: both files spend
 # comments explaining what they refuse to reach, and a grep over the whole
@@ -186,6 +217,7 @@ test "$lines" -eq 53 ||
 dupes=$(sed -n '1,12p' "$expected" | paste - - - | awk '{print $1, $2}' | sort | uniq -d)
 test -z "$dupes" || fail "duplicate (method, path) pair in the table: $dupes"
 
+printf 'boot: the core cannot construct a capability, and does not own main: PASS\n'
 printf 'boot: canonical contract pinned at its boundary: PASS\n'
 printf 'boot: fixed-rank dispatch, every closed outcome read by name: PASS\n'
 printf 'boot: handlers are pure and time is an injected capability: PASS\n'

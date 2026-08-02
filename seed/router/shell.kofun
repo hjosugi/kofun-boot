@@ -1,0 +1,80 @@
+# kofun-boot imperative shell: the table, the capabilities, the emission.
+#
+# Everything the core is forbidden to name lives here, in one place a reader
+# can hold: which routes exist, what the capability record contains, and what
+# gets printed. Concatenated after core.kofun by scripts/build-seed.sh.
+
+fn emit_dispatch(table: RouteTable, request: Request) -> Int {
+    let result: RouteResult = dispatch(table, request)
+    print(request.method)
+    print(request.path)
+    print(result_kind(result))
+    print(result_payload(result))
+    return 0
+}
+
+fn main() -> Int {
+    let table: RouteTable = boot_table()
+
+    # --- the table itself, so the golden pins the compiled form
+    print(table.r0_method)
+    print(table.r0_path)
+    print(table.r0_handler)
+    print(table.r1_method)
+    print(table.r1_path)
+    print(table.r1_handler)
+    print(table.r2_method)
+    print(table.r2_path)
+    print(table.r2_handler)
+    print(table.r3_method)
+    print(table.r3_path)
+    print(table.r3_handler)
+
+    # --- every dispatch outcome, one per closed constructor
+    let hello: Request = request_at(method_get(), path_hello(), 0)
+    emit_dispatch(table, hello)
+    let sum: Request = request_at(method_post(), path_sum(), 64)
+    emit_dispatch(table, sum)
+    let wrong_method: Request = request_at(method_get(), path_sum(), 0)
+    emit_dispatch(table, wrong_method)
+    let both_methods: Request = request_at(method_post(), path_bench(), 0)
+    emit_dispatch(table, both_methods)
+    let missing: Request = request_at(method_get(), 999, 0)
+    emit_dispatch(table, missing)
+
+    # --- size is checked before the route: an oversized body to a known
+    #     route and to an unknown one report the same thing
+    let oversized_known: Request = request_at(
+        method_get(),
+        path_hello(),
+        4097
+    )
+    emit_dispatch(table, oversized_known)
+    let oversized_unknown: Request = request_at(method_get(), 999, 4097)
+    emit_dispatch(table, oversized_unknown)
+
+    # --- the limit itself is inside the limit: half-open at the top
+    let at_limit: Request = request_at(method_get(), path_hello(), 4096)
+    emit_dispatch(table, at_limit)
+
+    # --- a wrong method on a path that allows both methods still names both
+    #     (bench only has GET and POST, so its Allow set is 3; a method code
+    #     outside the table proves the set does not depend on the request)
+    let odd_method: Request = request_at(9, path_bench(), 0)
+    emit_dispatch(table, odd_method)
+
+    # --- handlers are pure: the same request and the same capability record
+    #     produce the same response, and time is the injected field
+    let clock: Capabilities = Capabilities(now_seconds: 42)
+    let hello_response: Response = handle_hello(hello, clock)
+    print(hello_response.status)
+    print(hello_response.body_code)
+    let sum_response: Response = handle_sum(sum, clock)
+    print(sum_response.status)
+    print(sum_response.body_code)
+    let later: Capabilities = Capabilities(now_seconds: 43)
+    let hello_later: Response = handle_hello(hello, later)
+    print(hello_later.body_code)
+
+    return 0
+}

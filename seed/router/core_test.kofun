@@ -1,0 +1,206 @@
+# Unit tests for the functional core.
+#
+# `tooling/kotest/run.sh` pairs this file with its companion `core.kofun`
+# automatically, so these tests call the core directly — no server, no socket,
+# no build step of their own. That is the point of the core being pure: its
+# tests are arithmetic.
+#
+# Every test returns its failed-assertion count, so `0` is a pass. Assertions
+# accumulate with `+` because the executable slice has no exceptions, which
+# makes a partially-failing test report *every* thing that is wrong rather
+# than only the first.
+
+# ------------------------------------------------------------- the table
+
+fn test_table_is_the_four_declared_routes() -> Int {
+    let table: RouteTable = boot_table()
+    let mut failures = 0
+    failures = failures + expect_eq_int(table.r0_method, method_get())
+    failures = failures + expect_eq_int(table.r0_path, path_hello())
+    failures = failures + expect_eq_int(table.r0_handler, 1)
+    failures = failures + expect_eq_int(table.r1_method, method_post())
+    failures = failures + expect_eq_int(table.r1_path, path_sum())
+    failures = failures + expect_eq_int(table.r2_path, path_bench())
+    failures = failures + expect_eq_int(table.r3_path, path_bench())
+    return failures
+}
+
+# A duplicate (method, path) pair would make dispatch ambiguous. The table is
+# fixed at build time, so this is checkable arithmetic rather than a promise:
+# no two slots may agree on both fields.
+fn test_no_two_slots_share_a_method_and_path() -> Int {
+    let table: RouteTable = boot_table()
+    let mut failures = 0
+    let pair0: Int = table.r0_method * 1000 + table.r0_path
+    let pair1: Int = table.r1_method * 1000 + table.r1_path
+    let pair2: Int = table.r2_method * 1000 + table.r2_path
+    let pair3: Int = table.r3_method * 1000 + table.r3_path
+    failures = failures + expect_ne_int(pair0, pair1)
+    failures = failures + expect_ne_int(pair0, pair2)
+    failures = failures + expect_ne_int(pair0, pair3)
+    failures = failures + expect_ne_int(pair1, pair2)
+    failures = failures + expect_ne_int(pair1, pair3)
+    failures = failures + expect_ne_int(pair2, pair3)
+    return failures
+}
+
+# ---------------------------------------------------------- every outcome
+
+fn test_a_matched_route_names_its_handler() -> Int {
+    let table: RouteTable = boot_table()
+    let request: Request = request_at(method_get(), path_hello(), 0)
+    let result: RouteResult = dispatch(table, request)
+    let mut failures = 0
+    failures = failures + expect_eq_int(result_kind(result), kind_matched())
+    failures = failures + expect_eq_int(result_payload(result), 1)
+    return failures
+}
+
+fn test_an_unknown_path_is_not_found_carrying_the_path() -> Int {
+    let table: RouteTable = boot_table()
+    let request: Request = request_at(method_get(), 999, 0)
+    let result: RouteResult = dispatch(table, request)
+    let mut failures = 0
+    failures = failures + expect_eq_int(result_kind(result), kind_not_found())
+    failures = failures + expect_eq_int(result_payload(result), 999)
+    return failures
+}
+
+# The point of MethodNotAllowed carrying a payload: a caller learns what would
+# have worked. `/sum` is POST-only, so the Allow set is the POST bit alone.
+fn test_wrong_method_names_the_method_that_would_have_worked() -> Int {
+    let table: RouteTable = boot_table()
+    let request: Request = request_at(method_get(), path_sum(), 0)
+    let result: RouteResult = dispatch(table, request)
+    let mut failures = 0
+    failures = failures
+        + expect_eq_int(result_kind(result), kind_method_not_allowed())
+    failures = failures + expect_eq_int(result_payload(result), 2)
+    return failures
+}
+
+# `/bench` has both methods, so its Allow set is both bits — and it stays both
+# bits for a method that is not in the table at all, which proves the set is a
+# property of the path rather than of the request.
+fn test_the_allow_set_is_a_property_of_the_path() -> Int {
+    let table: RouteTable = boot_table()
+    let known: Request = request_at(method_get(), path_bench(), 0)
+    let stranger: Request = request_at(9, path_bench(), 0)
+    let mut failures = 0
+    failures = failures + expect_eq_int(allowed_set(table, known), 3)
+    failures = failures + expect_eq_int(allowed_set(table, stranger), 3)
+    let result: RouteResult = dispatch(table, stranger)
+    failures = failures
+        + expect_eq_int(result_kind(result), kind_method_not_allowed())
+    failures = failures + expect_eq_int(result_payload(result), 3)
+    return failures
+}
+
+fn test_oversized_body_carries_the_limit_it_exceeded() -> Int {
+    let table: RouteTable = boot_table()
+    let request: Request = request_at(method_get(), path_hello(), 4097)
+    let result: RouteResult = dispatch(table, request)
+    let mut failures = 0
+    failures = failures
+        + expect_eq_int(result_kind(result), kind_payload_too_large())
+    failures = failures + expect_eq_int(result_payload(result), body_limit())
+    return failures
+}
+
+# ------------------------------------------------------- the stated order
+#
+# Size before route, route before method. These two tests are the reason the
+# order is written down: an oversized request must not be able to learn which
+# routes exist by watching the refusal change.
+
+fn test_size_is_refused_before_the_table_is_consulted() -> Int {
+    let table: RouteTable = boot_table()
+    let known: Request = request_at(method_get(), path_hello(), 4097)
+    let unknown: Request = request_at(method_get(), 999, 4097)
+    let wrong_method: Request = request_at(method_get(), path_sum(), 4097)
+    let mut failures = 0
+    failures = failures
+        + expect_eq_int(result_kind(dispatch(table, known)), kind_payload_too_large())
+    failures = failures
+        + expect_eq_int(result_kind(dispatch(table, unknown)), kind_payload_too_large())
+    failures = failures
+        + expect_eq_int(result_kind(dispatch(table, wrong_method)), kind_payload_too_large())
+    # …and all three report the same payload, so nothing leaks.
+    failures = failures
+        + expect_eq_int(result_payload(dispatch(table, known)), body_limit())
+    failures = failures
+        + expect_eq_int(result_payload(dispatch(table, unknown)), body_limit())
+    return failures
+}
+
+# Half-open at the top: the limit itself is inside the limit. An off-by-one
+# here rejects a request the contract accepts.
+fn test_the_limit_itself_is_accepted() -> Int {
+    let table: RouteTable = boot_table()
+    let at_limit: Request = request_at(method_get(), path_hello(), 4096)
+    let over: Request = request_at(method_get(), path_hello(), 4097)
+    let mut failures = 0
+    failures = failures
+        + expect_eq_int(result_kind(dispatch(table, at_limit)), kind_matched())
+    failures = failures
+        + expect_eq_int(result_kind(dispatch(table, over)), kind_payload_too_large())
+    return failures
+}
+
+# ------------------------------------------------------ dispatch is total
+#
+# Every request produces exactly one of the four constructors, including
+# requests built from values the table never mentions. A dispatcher with a
+# fifth, silent outcome is the bug this test exists to prevent.
+
+fn test_every_request_produces_one_of_four_kinds() -> Int {
+    let table: RouteTable = boot_table()
+    let mut failures = 0
+    failures = failures
+        + expect_between_int(result_kind(dispatch(table, request_at(1, 101, 0))), 1, 4)
+    failures = failures
+        + expect_between_int(result_kind(dispatch(table, request_at(2, 102, 10))), 1, 4)
+    failures = failures
+        + expect_between_int(result_kind(dispatch(table, request_at(0, 0, 0))), 1, 4)
+    failures = failures
+        + expect_between_int(result_kind(dispatch(table, request_at(0 - 1, 0 - 1, 0))), 1, 4)
+    failures = failures
+        + expect_between_int(result_kind(dispatch(table, request_at(9, 999, 99999))), 1, 4)
+    return failures
+}
+
+# ---------------------------------------------------------- purity of the
+#                                                             handlers
+#
+# The same request and the same capability record must produce the same
+# response, and the only way the answer moves is if the injected clock moves.
+# This is what makes a recorded run replayable.
+
+fn test_a_handler_is_a_function_of_its_capability() -> Int {
+    let request: Request = request_at(method_get(), path_hello(), 0)
+    let clock: Capabilities = Capabilities(now_seconds: 42)
+    let same: Capabilities = Capabilities(now_seconds: 42)
+    let later: Capabilities = Capabilities(now_seconds: 43)
+    let first: Response = handle_hello(request, clock)
+    let repeated: Response = handle_hello(request, same)
+    let moved: Response = handle_hello(request, later)
+    let mut failures = 0
+    failures = failures + expect_eq_int(first.body_code, repeated.body_code)
+    failures = failures + expect_eq_int(first.status, 200)
+    failures = failures + expect_ne_int(first.body_code, moved.body_code)
+    failures = failures + expect_eq_int(moved.body_code - first.body_code, 1)
+    return failures
+}
+
+fn test_handlers_do_not_share_state() -> Int {
+    let hello: Request = request_at(method_get(), path_hello(), 0)
+    let sum: Request = request_at(method_post(), path_sum(), 64)
+    let clock: Capabilities = Capabilities(now_seconds: 42)
+    let mut failures = 0
+    let a: Response = handle_hello(hello, clock)
+    let b: Response = handle_sum(sum, clock)
+    let a_again: Response = handle_hello(hello, clock)
+    failures = failures + expect_eq_int(a.body_code, a_again.body_code)
+    failures = failures + expect_eq_int(b.body_code, 106)
+    return failures
+}
