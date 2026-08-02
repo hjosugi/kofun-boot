@@ -31,6 +31,8 @@ to prose:
 | document | question it answers | tracker |
 |---|---|---|
 | [`WEB_FRAMEWORKS.md`](WEB_FRAMEWORKS.md) | What do the best server frameworks get right, and what is the one declaration everything should derive from? | [R1 #16](https://github.com/hjosugi/kofun-boot/issues/16) |
+| [`SPRING_FASTAPI_GIN.md`](SPRING_FASTAPI_GIN.md) | Spring Boot 4.1, FastAPI, Ginの強みをどのように一つのKofun frameworkへ適応するか? | [R1 #16](https://github.com/hjosugi/kofun-boot/issues/16) |
+| [`MODULAR_MONOLITH_DDD.md`](MODULAR_MONOLITH_DDD.md) | modular monolithとDDD戦術パターンの何をadopt/adapt/rejectするか? | [#36](https://github.com/hjosugi/kofun-boot/issues/36), [L12 #27](https://github.com/hjosugi/kofun-boot/issues/27) |
 | [`DESKTOP_FRAMEWORKS.md`](DESKTOP_FRAMEWORKS.md) | What does a desktop app actually cost, and which costs are the webview's fault? | [R7 #22](https://github.com/hjosugi/kofun-boot/issues/22), [L9 #9](https://github.com/hjosugi/kofun-boot/issues/9) |
 | [`RENDER_BACKENDS.md`](RENDER_BACKENDS.md) | Can a webview be replaced by something native and faster — and what does that really require? | [R10 #28](https://github.com/hjosugi/kofun-boot/issues/28) |
 | [`EFFECT_SYSTEMS.md`](EFFECT_SYSTEMS.md) | How do languages that take effects seriously actually handle them, and which of those designs survives a language without higher-kinded types? | [R3 #18](https://github.com/hjosugi/kofun-boot/issues/18), [L11 #26](https://github.com/hjosugi/kofun-boot/issues/26) |
@@ -55,7 +57,15 @@ a filed decision, it says so and the disagreement is filed as a
 `needs-decision` issue rather than settled in prose —
 [#28](https://github.com/hjosugi/kofun-boot/issues/28) is the one such case.
 
+## Research pack
+
+[`PACKAGE.md`](PACKAGE.md) defines the packaged reading order, verification,
+and boundary statement. `scripts/build-research-pack.sh` creates a deterministic
+ZIP; `tests/research/check.sh` builds it twice, including once under `env -i`,
+and compares the bytes.
+
 ## Stamp
 
-Written 2026-08-02 against `main` at
-`af21d4cbe1fe15154a17a30e6cfd34776f765c31`.
+The series was written on 2026-08-02. Each dossier owns its source and version
+stamp; the generated pack owns a content manifest instead of claiming one Git
+commit for independently refreshed documents.

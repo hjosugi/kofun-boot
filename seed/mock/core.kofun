@@ -1,0 +1,491 @@
+# kofun-boot mock API: a REST resource from a seed dataset.
+#
+# json-server's idea, with its one weakness removed. json-server hands you a
+# full REST API from a JSON file in seconds, which is why everyone reaches for
+# it — and it mutates that file in place, so a run depends on every run before
+# it and "it worked yesterday" is not a reproducible claim.
+#
+# Here a mutation returns a *new store*. `apply` is
+#
+#     Store -> Operation -> StoreStep
+#
+# and a session is a fold over the requests. That makes three things true at
+# once, none of which json-server can offer: a sequence of requests replays
+# byte-identically from the same seed; a test can assert the store *between*
+# any two requests; and the id counter is carried in the value, so `POST`
+# allocates deterministically rather than from a clock or a random source.
+# The fold is the Event Sourcing shape, and it is here because the language
+# left no other option — there is nothing ambient to mutate.
+#
+# This file is the functional core: it may receive a store and an operation,
+# and may not construct a capability or own an entry point. The gate reads it
+# with comments stripped and enforces both.
+#
+# Bounded to four rows, the way the language's own fixtures bound themselves.
+# contracts/mock.kofun holds the canonical surface — a List of records, Text
+# fields, JSON bodies — and this projects it into the Stage 2 slice without
+# changing one decision.
+
+# ------------------------------------------------------------- constants
+
+fn capacity() -> Int {
+    return 4
+}
+
+fn slot_empty() -> Int {
+    return 0
+}
+
+fn slot_live() -> Int {
+    return 1
+}
+
+# Operations, as the REST surface maps onto them.
+fn op_list() -> Int {
+    return 1
+}
+
+fn op_show() -> Int {
+    return 2
+}
+
+fn op_create() -> Int {
+    return 3
+}
+
+fn op_update() -> Int {
+    return 4
+}
+
+fn op_delete() -> Int {
+    return 5
+}
+
+# Outcomes. Every one carries what was observed.
+fn outcome_collection() -> Int {
+    return 1
+}
+
+fn outcome_item() -> Int {
+    return 2
+}
+
+fn outcome_created() -> Int {
+    return 3
+}
+
+fn outcome_updated() -> Int {
+    return 4
+}
+
+fn outcome_deleted() -> Int {
+    return 5
+}
+
+fn outcome_missing() -> Int {
+    return 6
+}
+
+fn outcome_full() -> Int {
+    return 7
+}
+
+# ---------------------------------------------------------------- values
+
+# One row. `state` is empty or live rather than the row being absent, because
+# a deleted row must leave its id spent: re-creating and getting the same id
+# back would make two different resources indistinguishable in a replay.
+type Row = {
+    id: Int,
+    value: Int,
+    state: Int,
+}
+
+# The whole resource. Fixed arity, and `next_id` travels inside the value —
+# that is what makes `POST` deterministic without a clock or an entropy
+# source.
+type Store = {
+    s0_id: Int,
+    s0_value: Int,
+    s0_state: Int,
+    s1_id: Int,
+    s1_value: Int,
+    s1_state: Int,
+    s2_id: Int,
+    s2_value: Int,
+    s2_state: Int,
+    s3_id: Int,
+    s3_value: Int,
+    s3_state: Int,
+    next_id: Int,
+}
+
+type Operation = {
+    kind: Int,
+    id: Int,
+    value: Int,
+}
+
+# The closed outcome domain. `Missing` carries the id that was not there;
+# `Full` carries the capacity that was reached — a caller learns the bound
+# rather than being told "no".
+type MockOutcome =
+    | Collection(live: Int)
+    | Item(value: Int)
+    | Created(id: Int)
+    | Updated(id: Int)
+    | Deleted(id: Int)
+    | Missing(id: Int)
+    | Full(capacity: Int)
+
+# One transition: the store after, and what happened. Returning both together
+# is what stops a caller from applying an operation and forgetting the state
+# it produced — there is no other way to get the next store.
+type StoreStep = {
+    s0_id: Int,
+    s0_value: Int,
+    s0_state: Int,
+    s1_id: Int,
+    s1_value: Int,
+    s1_state: Int,
+    s2_id: Int,
+    s2_value: Int,
+    s2_state: Int,
+    s3_id: Int,
+    s3_value: Int,
+    s3_state: Int,
+    next_id: Int,
+    outcome: Int,
+    payload: Int,
+}
+
+# ------------------------------------------------------ outcome accessors
+
+fn outcome_of(kind: Int, payload: Int) -> MockOutcome {
+    if kind == outcome_item() {
+        return Item(payload)
+    }
+    if kind == outcome_created() {
+        return Created(payload)
+    }
+    if kind == outcome_updated() {
+        return Updated(payload)
+    }
+    if kind == outcome_deleted() {
+        return Deleted(payload)
+    }
+    if kind == outcome_missing() {
+        return Missing(payload)
+    }
+    if kind == outcome_full() {
+        return Full(payload)
+    }
+    return Collection(payload)
+}
+
+fn outcome_kind(outcome: MockOutcome) -> Int {
+    let mut kind = 0
+    match outcome {
+        Collection(_) => { kind = outcome_collection() },
+        Item(_) => { kind = outcome_item() },
+        Created(_) => { kind = outcome_created() },
+        Updated(_) => { kind = outcome_updated() },
+        Deleted(_) => { kind = outcome_deleted() },
+        Missing(_) => { kind = outcome_missing() },
+        Full(_) => { kind = outcome_full() },
+    }
+    return kind
+}
+
+fn outcome_payload(outcome: MockOutcome) -> Int {
+    let mut payload = 0
+    match outcome {
+        Collection(live) => { payload = live },
+        Item(value) => { payload = value },
+        Created(id) => { payload = id },
+        Updated(id) => { payload = id },
+        Deleted(id) => { payload = id },
+        Missing(id) => { payload = id },
+        Full(capacity) => { payload = capacity },
+    }
+    return payload
+}
+
+# ------------------------------------------------------- store accessors
+
+fn seeded_store() -> Store {
+    let store: Store = Store(
+        s0_id: 1,
+        s0_value: 10,
+        s0_state: slot_live(),
+        s1_id: 2,
+        s1_value: 20,
+        s1_state: slot_live(),
+        s2_id: 0,
+        s2_value: 0,
+        s2_state: slot_empty(),
+        s3_id: 0,
+        s3_value: 0,
+        s3_state: slot_empty(),
+        next_id: 3
+    )
+    return store
+}
+
+fn operation(kind: Int, id: Int, value: Int) -> Operation {
+    let op: Operation = Operation(kind: kind, id: id, value: value)
+    return op
+}
+
+fn live_count(store: Store) -> Int {
+    return store.s0_state + store.s1_state + store.s2_state + store.s3_state
+}
+
+fn eq(left: Int, right: Int) -> Int {
+    if left == right {
+        return 1
+    }
+    return 0
+}
+
+# Whether a live row carries this id. Four comparisons, always — the same
+# fixed-rank discipline the router uses, so a lookup cannot take two paths.
+fn id_hits(store: Store, id: Int) -> Int {
+    return store.s0_state * eq(store.s0_id, id)
+        + store.s1_state * eq(store.s1_id, id)
+        + store.s2_state * eq(store.s2_id, id)
+        + store.s3_state * eq(store.s3_id, id)
+}
+
+fn value_of(store: Store, id: Int) -> Int {
+    return store.s0_state * eq(store.s0_id, id) * store.s0_value
+        + store.s1_state * eq(store.s1_id, id) * store.s1_value
+        + store.s2_state * eq(store.s2_id, id) * store.s2_value
+        + store.s3_state * eq(store.s3_id, id) * store.s3_value
+}
+
+# The first empty slot, one-based, or 0 when the resource is full. Written as
+# a rank so the answer does not depend on how the store got into this shape.
+fn free_slot(store: Store) -> Int {
+    if store.s0_state == slot_empty() {
+        return 1
+    }
+    if store.s1_state == slot_empty() {
+        return 2
+    }
+    if store.s2_state == slot_empty() {
+        return 3
+    }
+    if store.s3_state == slot_empty() {
+        return 4
+    }
+    return 0
+}
+
+# ------------------------------------------------------------ transitions
+
+fn step_of(
+    store: Store,
+    next_id: Int,
+    outcome: Int,
+    payload: Int
+) -> StoreStep {
+    let step: StoreStep = StoreStep(
+        s0_id: store.s0_id,
+        s0_value: store.s0_value,
+        s0_state: store.s0_state,
+        s1_id: store.s1_id,
+        s1_value: store.s1_value,
+        s1_state: store.s1_state,
+        s2_id: store.s2_id,
+        s2_value: store.s2_value,
+        s2_state: store.s2_state,
+        s3_id: store.s3_id,
+        s3_value: store.s3_value,
+        s3_state: store.s3_state,
+        next_id: next_id,
+        outcome: outcome,
+        payload: payload
+    )
+    return step
+}
+
+# The store a step produced. There is no other way to obtain it, which is how
+# a caller is stopped from advancing the resource and dropping the result.
+fn step_store(step: StoreStep) -> Store {
+    let store: Store = Store(
+        s0_id: step.s0_id,
+        s0_value: step.s0_value,
+        s0_state: step.s0_state,
+        s1_id: step.s1_id,
+        s1_value: step.s1_value,
+        s1_state: step.s1_state,
+        s2_id: step.s2_id,
+        s2_value: step.s2_value,
+        s2_state: step.s2_state,
+        s3_id: step.s3_id,
+        s3_value: step.s3_value,
+        s3_state: step.s3_state,
+        next_id: step.next_id
+    )
+    return store
+}
+
+fn step_outcome(step: StoreStep) -> MockOutcome {
+    return outcome_of(step.outcome, step.payload)
+}
+
+# A rejected operation consumes nothing: the rows and the id counter stay
+# exactly where the last accepted transition left them.
+fn unchanged(store: Store, outcome: Int, payload: Int) -> StoreStep {
+    return step_of(store, store.next_id, outcome, payload)
+}
+
+# Writes a row into one slot. The slot is chosen by the caller, which has
+# already decided whether it is creating or replacing.
+fn with_slot(
+    store: Store,
+    slot: Int,
+    id: Int,
+    value: Int,
+    state: Int,
+    next_id: Int,
+    outcome: Int,
+    payload: Int
+) -> StoreStep {
+    let mut a_id = store.s0_id
+    let mut a_value = store.s0_value
+    let mut a_state = store.s0_state
+    let mut b_id = store.s1_id
+    let mut b_value = store.s1_value
+    let mut b_state = store.s1_state
+    let mut c_id = store.s2_id
+    let mut c_value = store.s2_value
+    let mut c_state = store.s2_state
+    let mut d_id = store.s3_id
+    let mut d_value = store.s3_value
+    let mut d_state = store.s3_state
+    if slot == 1 {
+        a_id = id
+        a_value = value
+        a_state = state
+    }
+    if slot == 2 {
+        b_id = id
+        b_value = value
+        b_state = state
+    }
+    if slot == 3 {
+        c_id = id
+        c_value = value
+        c_state = state
+    }
+    if slot == 4 {
+        d_id = id
+        d_value = value
+        d_state = state
+    }
+    let written: Store = Store(
+        s0_id: a_id,
+        s0_value: a_value,
+        s0_state: a_state,
+        s1_id: b_id,
+        s1_value: b_value,
+        s1_state: b_state,
+        s2_id: c_id,
+        s2_value: c_value,
+        s2_state: c_state,
+        s3_id: d_id,
+        s3_value: d_value,
+        s3_state: d_state,
+        next_id: next_id
+    )
+    return step_of(written, next_id, outcome, payload)
+}
+
+# The slot holding a live id, one-based, or 0. The rank form again: the answer
+# is a sum, not a search that could stop early somewhere different.
+fn slot_of(store: Store, id: Int) -> Int {
+    return store.s0_state * eq(store.s0_id, id) * 1
+        + store.s1_state * eq(store.s1_id, id) * 2
+        + store.s2_state * eq(store.s2_id, id) * 3
+        + store.s3_state * eq(store.s3_id, id) * 4
+}
+
+# ---------------------------------------------------------------- apply
+#
+# The whole REST surface, as one total function. Every branch returns a step,
+# so there is no operation that leaves the store undefined, and no path
+# silently succeeds: a miss is `Missing` carrying the id, a full resource is
+# `Full` carrying the capacity.
+
+fn apply(store: Store, op: Operation) -> StoreStep {
+    if op.kind == op_list() {
+        return unchanged(store, outcome_collection(), live_count(store))
+    }
+
+    if op.kind == op_show() {
+        if id_hits(store, op.id) == 0 {
+            return unchanged(store, outcome_missing(), op.id)
+        }
+        return unchanged(store, outcome_item(), value_of(store, op.id))
+    }
+
+    if op.kind == op_create() {
+        let slot: Int = free_slot(store)
+        if slot == 0 {
+            return unchanged(store, outcome_full(), capacity())
+        }
+        # The id comes from the store, so the same seed and the same request
+        # sequence always allocate the same ids.
+        return with_slot(
+            store,
+            slot,
+            store.next_id,
+            op.value,
+            slot_live(),
+            store.next_id + 1,
+            outcome_created(),
+            store.next_id
+        )
+    }
+
+    if op.kind == op_update() {
+        let slot: Int = slot_of(store, op.id)
+        if slot == 0 {
+            return unchanged(store, outcome_missing(), op.id)
+        }
+        return with_slot(
+            store,
+            slot,
+            op.id,
+            op.value,
+            slot_live(),
+            store.next_id,
+            outcome_updated(),
+            op.id
+        )
+    }
+
+    if op.kind == op_delete() {
+        let slot: Int = slot_of(store, op.id)
+        if slot == 0 {
+            return unchanged(store, outcome_missing(), op.id)
+        }
+        # The row empties but `next_id` does not rewind: a deleted id is
+        # spent, so a later create cannot reuse it and make two resources
+        # indistinguishable in a replay.
+        return with_slot(
+            store,
+            slot,
+            0,
+            0,
+            slot_empty(),
+            store.next_id,
+            outcome_deleted(),
+            op.id
+        )
+    }
+
+    return unchanged(store, outcome_missing(), op.kind)
+}
