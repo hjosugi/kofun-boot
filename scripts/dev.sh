@@ -15,6 +15,7 @@ set -eu
 #   scripts/dev.sh --client   print the typed client the route table projects
 #   scripts/dev.sh --scaffold generate a project and run its gate
 #   scripts/dev.sh --replay   replay the recorded session trace
+#   scripts/dev.sh --bench    measure, or refuse if the machine is busy
 #
 # The design rule is that the loop a developer runs and the loop CI runs are
 # the same commands, so a green terminal and a green pipeline mean the same
@@ -83,6 +84,10 @@ case "${1:-}" in
         ;;
     --client)
         sh "$ROOT/scripts/client-ts.sh"
+        ;;
+    --bench)
+        shift
+        sh "$ROOT/scripts/bench.sh" "${1:-record}"
         ;;
     --replay)
         sh "$ROOT/scripts/trace.sh" replay "$ROOT/contracts/session.trace"
