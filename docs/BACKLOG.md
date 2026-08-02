@@ -86,6 +86,18 @@ four-digit expectation comes from, and it is arithmetic rather than optimism.
 L11 and L12 are new in this document; they are the lanes the research
 dossiers produced, and `docs/ROADMAP.md` carries them in its lane table.
 
+### The R-series is orthogonal
+
+[R0 #15](https://github.com/hjosugi/kofun-boot/issues/15) and its children
+R1–R10 are a **research programme**, not a lane. Each R issue produces a
+decision that lands in one or more lanes, and the lane's epics carry the
+implementation. An R issue closes when its decision is recorded and its
+minimal artifact is reproducible under a gate — not when the reading is done.
+
+The two structures meet in one place: a lane epic that implements an R
+decision links it, and an R decision that no lane has picked up is a gap in
+this table rather than a finished piece of research.
+
 ## How the tracker grows
 
 Not by filing a thousand issues. By filing, for each epic, **one epic issue

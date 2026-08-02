@@ -28,15 +28,32 @@ to prose:
 
 ## The dossiers
 
-| document | question it answers |
-|---|---|
-| [`WEB_FRAMEWORKS.md`](WEB_FRAMEWORKS.md) | What do the best server frameworks get right, and what is the one declaration everything should derive from? |
-| [`DESKTOP_FRAMEWORKS.md`](DESKTOP_FRAMEWORKS.md) | What does a desktop app actually cost, and which costs are the webview's fault? |
-| [`RENDER_BACKENDS.md`](RENDER_BACKENDS.md) | Can a webview be replaced by something native and faster — and what does that really require? |
-| [`EFFECT_SYSTEMS.md`](EFFECT_SYSTEMS.md) | How do languages that take effects seriously actually handle them, and which of those designs survives a language without higher-kinded types? |
+| document | question it answers | tracker |
+|---|---|---|
+| [`WEB_FRAMEWORKS.md`](WEB_FRAMEWORKS.md) | What do the best server frameworks get right, and what is the one declaration everything should derive from? | [R1 #16](https://github.com/hjosugi/kofun-boot/issues/16) |
+| [`DESKTOP_FRAMEWORKS.md`](DESKTOP_FRAMEWORKS.md) | What does a desktop app actually cost, and which costs are the webview's fault? | [R7 #22](https://github.com/hjosugi/kofun-boot/issues/22), [L9 #9](https://github.com/hjosugi/kofun-boot/issues/9) |
+| [`RENDER_BACKENDS.md`](RENDER_BACKENDS.md) | Can a webview be replaced by something native and faster — and what does that really require? | [R10 #28](https://github.com/hjosugi/kofun-boot/issues/28) |
+| [`EFFECT_SYSTEMS.md`](EFFECT_SYSTEMS.md) | How do languages that take effects seriously actually handle them, and which of those designs survives a language without higher-kinded types? | [R3 #18](https://github.com/hjosugi/kofun-boot/issues/18), [L11 #26](https://github.com/hjosugi/kofun-boot/issues/26) |
 
 The architecture decisions these dossiers produced live one directory up, in
 [`docs/architecture/`](../architecture/).
+
+## Relationship to the R-series tracker issues
+
+[R0 #15](https://github.com/hjosugi/kofun-boot/issues/15) is the research
+*programme*: it defines the cohorts, the seven comparison axes, and the bar
+that a research issue does not close because somebody read an article. These
+documents are the written output of that programme, and they are deliberately
+narrower than it — four questions answered in depth rather than nine cohorts
+surveyed at breadth.
+
+Where a dossier reaches the same conclusion as an R-series issue, that is
+convergence and it is recorded as such rather than restated: `EFFECT_SYSTEMS`
+and R3 both land on *capabilities plus input to a closed result, not a monad
+stack*, arrived at from different evidence. Where a dossier **disagrees** with
+a filed decision, it says so and the disagreement is filed as a
+`needs-decision` issue rather than settled in prose —
+[#28](https://github.com/hjosugi/kofun-boot/issues/28) is the one such case.
 
 ## Stamp
 
