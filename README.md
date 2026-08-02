@@ -20,7 +20,9 @@ Everything below follows from that sentence.
 ```sh
 git clone --recurse-submodules https://github.com/hjosugi/kofun-boot
 cd kofun-boot
-sh scripts/dev.sh          # 22 unit tests, a build, and a golden check — about a second
+sh scripts/dev.sh                      # 22 unit tests, a build, a golden check — about a second
+sh scripts/new.sh ../my-app --name my-app   # a project that already has the boundary
+cd ../my-app && sh tests/check.sh      # its own gate: boundary, suite, golden, determinism
 ```
 
 | command | what |
@@ -31,6 +33,7 @@ sh scripts/dev.sh          # 22 unit tests, a build, and a golden check — abou
 | `sh scripts/dev.sh --serve` | a real server on a real socket |
 | `sh scripts/dev.sh --openapi` | the document the route table projects |
 | `sh scripts/dev.sh --client` | the typed client the route table projects |
+| `sh scripts/dev.sh --scaffold` | generate a project and run its gate |
 | `sh scripts/dev.sh --check` | exactly what CI runs, in CI's order |
 
 The last row is the point: a green terminal and a green pipeline are the same
@@ -108,6 +111,12 @@ sleeping, and asserts path capture, JSON decode, 404, 400-not-a-crash,
 keep-alive across two requests, and SIGTERM drain — killing the process on
 every exit path. Port 0 means parallel runs cannot collide.
 
+**The scaffold is a tested fixture, not a template.** `tests/scaffold/check.sh`
+generates a project on every CI run, runs *its* gate, and then breaks its core
+and requires that gate to refuse. A scaffold verified only by having been
+written once rots the first time the language moves — and rots in someone
+else's afternoon rather than in this build.
+
 **Every gate is verified in both directions.** A gate is added together with
 the demonstration that it fails: making the body limit exclusive fails exactly
 one named test; a handler that constructs its own clock fails with its line
@@ -124,7 +133,7 @@ number quoted; hand-editing the OpenAPI document fails with the diff.
 | Speed | Elysia, Gin, Hono | requests/sec published with its method — *unmeasured; no number appears here before the gate that measured it* |
 | Structured concurrency | Go's ergonomics, without the leaks | scoped spawn/join, deterministic schedules — blocked on the language RFC, and says so |
 | Desktop lighter than Tauri | Tauri, inverted | binary size and cold start as gated numbers — *unmeasured* |
-| A CLI worth living in | Rails, Spring Initializr | `boot new / dev / test / bench / openapi / gen` |
+| A CLI worth living in | Rails, Spring Initializr | `boot new / dev / test / bench / openapi / gen` — **`new`, `dev`, `test`, `openapi` and the client generator hold today** |
 
 ## Repository layout
 
@@ -133,10 +142,11 @@ number quoted; hand-editing the OpenAPI document fails with the diff.
 | `contracts/` | canonical surfaces ahead of the compiler, pinned by gates; the generated OpenAPI document |
 | `seed/router/` | the dispatcher: core, shell, unit suite, golden |
 | `seed/mock/` | the REST resource: core, unit suite |
-| `scripts/` | `dev.sh`, `build-seed.sh`, `openapi.sh`, `client-ts.sh` |
+| `scripts/` | `dev.sh`, `new.sh`, `build-seed.sh`, `openapi.sh`, `client-ts.sh` |
 | `tests/client/` | one call that must compile, two that must not |
 | `tests/boot/check.sh` | the gate: boundary, contract, dispatch decisions, projection, determinism |
 | `tests/integration/serve.sh` | a real server on a real socket |
+| `tests/scaffold/check.sh` | `boot new`'s output, generated and gated every run |
 | `docs/adr/` | the numbered decision log — why, and what it cost |
 | `docs/DESIGN.md`, `docs/ROADMAP.md` | the architecture; the lanes and what each is blocked on |
 | `vendor/kofun` | the pinned language checkout |

@@ -12,6 +12,7 @@ set -eu
 #   scripts/dev.sh --check    everything CI runs, in CI's order
 #   scripts/dev.sh --openapi  print the document the route table projects
 #   scripts/dev.sh --client   print the typed client the route table projects
+#   scripts/dev.sh --scaffold generate a project and run its gate
 #
 # The design rule is that the loop a developer runs and the loop CI runs are
 # the same commands, so a green terminal and a green pipeline mean the same
@@ -78,6 +79,9 @@ case "${1:-}" in
     --client)
         sh "$ROOT/scripts/client-ts.sh"
         ;;
+    --scaffold)
+        sh "$ROOT/tests/scaffold/check.sh"
+        ;;
     --serve)
         banner "serve"
         sh "$ROOT/tests/integration/serve.sh"
@@ -88,6 +92,7 @@ case "${1:-}" in
         run_tests
         sh "$ROOT/tests/boot/check.sh"
         sh "$ROOT/tests/integration/serve.sh"
+        sh "$ROOT/tests/scaffold/check.sh"
         ;;
     --watch)
         shift

@@ -49,3 +49,12 @@ jobs:
         with:
           submodules: true
       - run: sh tests/integration/serve.sh
+
+  scaffold:
+    name: Scaffold — boot new emits a project that passes its own gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - run: sh tests/scaffold/check.sh
