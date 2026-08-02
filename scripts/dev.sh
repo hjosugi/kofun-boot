@@ -16,6 +16,7 @@ set -eu
 #   scripts/dev.sh --scaffold generate a project and run its gate
 #   scripts/dev.sh --replay   replay the recorded session trace
 #   scripts/dev.sh --bench    measure, or refuse if the machine is busy
+#   scripts/dev.sh --release  verify the release is coherent; tag nothing
 #
 # The design rule is that the loop a developer runs and the loop CI runs are
 # the same commands, so a green terminal and a green pipeline mean the same
@@ -25,7 +26,16 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 KOTEST="$ROOT/vendor/kofun/tooling/kotest/run.sh"
 
 usage() {
-    sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'
+    # Delimited by the header block itself rather than by line numbers: the
+    # hardcoded '3,18p' silently dropped --release the moment a mode was added
+    # below line 18, which is the failure where help text quietly stops
+    # describing the tool. Print from the title to the blank comment line that
+    # ends the mode list.
+    awk '
+        /^# boot dev/ { inside = 1 }
+        inside && !/^#/ { exit }
+        inside { sub(/^# ?/, ""); print }
+    ' "$0"
 }
 
 banner() {
@@ -95,6 +105,12 @@ case "${1:-}" in
     --scaffold)
         sh "$ROOT/tests/scaffold/check.sh"
         ;;
+    --release)
+        # Verification only. Tagging and publishing are deliberately manual
+        # and live in docs/RELEASING.md, because they are the two steps that
+        # reach outside the repository.
+        sh "$ROOT/tests/release/check.sh"
+        ;;
     --serve)
         banner "serve"
         sh "$ROOT/tests/integration/serve.sh"
@@ -107,6 +123,7 @@ case "${1:-}" in
         sh "$ROOT/tests/research/check.sh"
         sh "$ROOT/tests/integration/serve.sh"
         sh "$ROOT/tests/scaffold/check.sh"
+        sh "$ROOT/tests/release/check.sh"
         ;;
     --watch)
         shift
