@@ -1,0 +1,98 @@
+# Unit evidence for inert effect values and total pure interpretation.
+
+fn test_every_effecting_cmd_carries_its_continuation() -> Int {
+    let mut failures = 0
+    failures = failures + expect_eq_int(cmd_continuation(HttpRequest(41)), 41)
+    failures = failures + expect_eq_int(cmd_continuation(ReadClock(42)), 42)
+    failures = failures + expect_eq_int(cmd_continuation(Persist(43)), 43)
+    failures = failures + expect_eq_int(cmd_continuation(CustomCmd(44)), 44)
+    return failures
+}
+
+fn test_every_effecting_sub_carries_its_continuation() -> Int {
+    let mut failures = 0
+    failures = failures + expect_eq_int(sub_continuation(Every(51)), 51)
+    failures = failures + expect_eq_int(sub_continuation(OnSignal(52)), 52)
+    failures = failures + expect_eq_int(sub_continuation(CustomSub(53)), 53)
+    return failures
+}
+
+fn test_custom_keeps_both_sums_open() -> Int {
+    let command: EffectStep = trace_custom_cmd(61, 7001)
+    let subscription: EffectStep = trace_custom_sub(62, 7002)
+    let mut failures = 0
+    failures = failures + expect_eq_int(command.effect, cmd_custom())
+    failures = failures + expect_eq_int(command.continuation, 61)
+    failures = failures + expect_eq_int(command.message, msg_custom_completed())
+    failures = failures + expect_eq_int(command.observed, 7001)
+    failures = failures + expect_eq_int(subscription.effect, sub_custom())
+    failures = failures + expect_eq_int(subscription.continuation, 62)
+    failures = failures + expect_eq_int(subscription.message, msg_custom_event())
+    failures = failures + expect_eq_int(subscription.observed, 7002)
+    return failures
+}
+
+fn test_http_success_returns_a_correlated_message() -> Int {
+    let step: EffectStep = interpret_http(9001, 41, 1000, 200, 201)
+    let mut failures = 0
+    failures = failures + expect_eq_int(step.effect, cmd_http_request())
+    failures = failures + expect_eq_int(step.argument, 9001)
+    failures = failures + expect_eq_int(step.continuation, 41)
+    failures = failures + expect_eq_int(step.message, msg_http_completed())
+    failures = failures + expect_eq_int(step.observed, 201)
+    return failures
+}
+
+fn test_http_timeout_is_a_message_carrying_the_deadline() -> Int {
+    let step: EffectStep = interpret_http(9002, 42, 1000, 1001, 0)
+    let mut failures = 0
+    failures = failures + expect_eq_int(step.continuation, 42)
+    failures = failures + expect_eq_int(step.message, msg_http_timed_out())
+    failures = failures + expect_eq_int(step.observed, 1000)
+    return failures
+}
+
+fn test_the_deadline_itself_completes() -> Int {
+    let step: EffectStep = interpret_http(9003, 43, 1000, 1000, 204)
+    let mut failures = 0
+    failures = failures + expect_eq_int(step.message, msg_http_completed())
+    failures = failures + expect_eq_int(step.observed, 204)
+    return failures
+}
+
+fn test_none_and_batch_request_no_answer() -> Int {
+    let none: EffectStep = trace_none()
+    let batch: EffectStep = trace_batch(2)
+    let mut failures = 0
+    failures = failures + expect_eq_int(none.message, msg_none())
+    failures = failures + expect_eq_int(none.continuation, 0)
+    failures = failures + expect_eq_int(batch.effect, cmd_batch())
+    failures = failures + expect_eq_int(batch.argument, 2)
+    failures = failures + expect_eq_int(batch.message, msg_none())
+    return failures
+}
+
+fn test_subscription_tick_carries_time_and_continuation() -> Int {
+    let step: EffectStep = trace_tick(51, 5000, 1700000000)
+    let mut failures = 0
+    failures = failures + expect_eq_int(step.source, source_sub())
+    failures = failures + expect_eq_int(step.effect, sub_every())
+    failures = failures + expect_eq_int(step.argument, 5000)
+    failures = failures + expect_eq_int(step.continuation, 51)
+    failures = failures + expect_eq_int(step.message, msg_tick())
+    failures = failures + expect_eq_int(step.observed, 1700000000)
+    return failures
+}
+
+fn test_every_http_observation_produces_a_message() -> Int {
+    let early: EffectStep = interpret_http(1, 71, 1000, 0, 200)
+    let exact: EffectStep = interpret_http(1, 71, 1000, 1000, 200)
+    let late: EffectStep = interpret_http(1, 71, 1000, 1001, 0)
+    let mut failures = 0
+    failures = failures + expect_between_int(early.message, 1, 2)
+    failures = failures + expect_between_int(exact.message, 1, 2)
+    failures = failures + expect_between_int(late.message, 1, 2)
+    failures = failures + expect_eq_int(early.continuation, 71)
+    failures = failures + expect_eq_int(late.continuation, 71)
+    return failures
+}

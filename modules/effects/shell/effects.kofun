@@ -1,0 +1,38 @@
+# Imperative shell for the bounded effect trace.
+#
+# It chooses observations and prints them. The core is inert: it cannot read a
+# clock, issue HTTP, persist, or subscribe. A different shell can interpret
+# the same values; this one is only executable evidence for the contract.
+
+fn emit_effect_step(step: EffectStep) -> Int {
+    print(step.source)
+    print(step.effect)
+    print(step.argument)
+    print(step.continuation)
+    print(step.message)
+    print(step.observed)
+    return 0
+}
+
+fn main() -> Int {
+    # No effect, then a bounded two-command batch.
+    emit_effect_step(trace_none())
+    emit_effect_step(trace_batch(2))
+
+    # The same effect constructor takes both paths. Its continuation remains
+    # present in both answers; only the supplied observation chooses the Msg.
+    emit_effect_step(interpret_http(9001, 41, 1000, 200, 200))
+    emit_effect_step(interpret_http(9002, 42, 1000, 1001, 0))
+
+    # Subscription events have the same correlation rule as command answers.
+    emit_effect_step(trace_tick(51, 5000, 1700000000))
+
+    # The remaining effecting constructors keep the same rule executable:
+    # request argument and observed answer stay distinct from continuation.
+    emit_effect_step(trace_clock(43, 1700000001))
+    emit_effect_step(trace_persist(44, 7001))
+    emit_effect_step(trace_custom_cmd(45, 8001))
+    emit_effect_step(trace_signal(52, 9))
+    emit_effect_step(trace_custom_sub(53, 8002))
+    return 0
+}

@@ -1,8 +1,9 @@
 # Architecture: the effect model
 
 Decided 2026-08-02 from [`docs/research/EFFECT_SYSTEMS.md`](../research/EFFECT_SYSTEMS.md).
-This document is the reasoning; the canonical shapes belong in `contracts/`
-and the executable evidence in `modules/*/core`.
+This document is the reasoning; the canonical shapes belong to
+`modules/effects/contract/effects.kofun` and the executable evidence to the
+same bounded context's `core/`, `shell/`, and `tests/` directories.
 
 ## The decision in one paragraph
 
@@ -51,17 +52,26 @@ and that sentence is true with or without a monad.
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-Layers 1 and 2 exist in the repository today in spirit:
+Layers 1 and 2 exist in the repository today:
 `modules/router/contract/router.kofun` declares `Capabilities`, and the router
 core plus shell prove a handler that
-receives its one capability as an argument and is pure. Layer 3 is the new
-work this design adds. Layer 4 is somebody else's lane, in another repository.
+receives its one capability as an argument and is pure. Layer 3 now exists in
+`modules/effects/`: its canonical contract is pinned at the documented
+compiler boundary, while a Stage 2 projection emits the same Cmd/Msg decisions
+on both backends under hostile environments. Layer 4 is somebody else's lane,
+in another repository.
 
 ## Layer 1 — capability records
 
 Unchanged from `docs/DESIGN.md`, restated here because layer 3 depends on it:
 a dependency is a value; the composition root is the single place a capability
 record is built; the core cannot name one.
+
+There is no universal effect bag. `CmdCapabilities` contains clock, HTTP,
+persistence, and custom command interpretation; `SubCapabilities` contains
+clock, signals, and custom subscription interpretation. A function cannot
+receive an authority its request vocabulary cannot exercise, so the signature
+remains the true statement of its dependencies.
 
 Three additions this design commits to:
 
@@ -191,8 +201,8 @@ When they arrive:
 
 | claim | how it is checked |
 |---|---|
-| a core module cannot perform an effect | FCIS gate: comments stripped, capability names greped, as `tests/boot/check.sh` already does for the seed |
-| every run is byte-replayable | record `Cmd`/`Msg`, replay, `cmp`; then re-run under hostile `TZ`, locale and `env -i` |
+| a core module cannot perform an effect | FCIS gate: comments stripped, capability names greped, as `scripts/check-modules.sh` and `tests/boot/check.sh` do |
+| every effect decision is byte-stable | `modules/effects/tests/effects.stdout`, both backends, then hostile `TZ`, locale and `env -i` |
 | the same core runs under any shell | one core, interpreted by the server shell and the desktop shell, both gated on the same trace |
 | an effect cannot outlive its scope | blocked on kofun #898; the gate lands with the surface |
 | the granted capability set is auditable | the shell prints the effective record; the gate reads the printed record, not the source |
