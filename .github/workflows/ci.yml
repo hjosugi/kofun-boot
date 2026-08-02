@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Boot gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The seed is checked and executed by the pinned language toolchain,
+          # so "it works" always means "at this revision".
+          submodules: true
+      - name: Report the pinned language revision
+        run: git -C vendor/kofun log -1 --format='vendor/kofun is at %h %s'
+      - name: Run the gate
+        run: sh tests/boot/check.sh

@@ -1,0 +1,110 @@
+# The canonical kofun-boot application surface.
+#
+# This file is ahead of the compiler on purpose. It declares the contract in
+# the shapes the language specifies — Text, List, multi-payload sums, Result —
+# and tests/boot/check.sh requires it to keep failing at the documented
+# compiler boundary, exactly as the language repository pins its own clock and
+# tzdb surfaces. The executable evidence is seed/router/router.kofun, which
+# projects these decisions into the Stage 2 slice without changing one of
+# them.
+#
+# Three rules shape everything below.
+#
+# One declaration, four artifacts. The route table is data; the dispatch
+# table, the request validation, the OpenAPI document, and the typed client
+# are all projections of it. Drift between any pair is a build failure.
+#
+# A dependency is a value. There is no container and no ambient authority: an
+# application is a function from its Capabilities to its routes, and a domain
+# module that names a capability does not belong to the core. The framework
+# does not soften the language's rule; it inherits it.
+#
+# Failure is a closed sum that carries what was observed. MethodNotAllowed
+# carries the methods that would have worked; PayloadTooLarge carries the
+# limit. No path defaults, and no status code is a convention.
+
+let BOOT_CONTRACT_VERSION = 1
+
+type Method =
+    | Get
+    | Post
+    | Put
+    | Delete
+
+type Path = {
+    segments: List[Text],
+}
+
+type Route = {
+    method: Method,
+    path: Path,
+    handler: HandlerId,
+}
+
+type RouteTable = {
+    routes: List[Route],
+}
+
+type Request = {
+    method: Method,
+    path: Path,
+    body: Bytes,
+}
+
+type RouteResult =
+    | Matched(handler: HandlerId, captures: List[Text])
+    | NotFound(path: Path)
+    | MethodNotAllowed(allowed: List[Method])
+    | PayloadTooLarge(limit: Int, observed: Int)
+
+# The capability record an application is a function of. Every field follows
+# the language's own capability contracts: the clock is the affine-handle
+# surface from stdlib/clock, time-zone rules are injected bytes from
+# stdlib/tzdb, and nothing here can be reached without being handed it.
+type Capabilities = {
+    clock: MonotonicClock,
+    system_clock: SystemClock,
+    tzdb: Tzdb,
+    entropy: EntropySource,
+    log: LogSink,
+}
+
+type Response = {
+    status: Int,
+    body: Bytes,
+}
+
+# Builds the dispatch table from the declared routes, refusing duplicates at
+# build time: a table with two identical (method, path) pairs is a typed
+# error, never a first-one-wins.
+fn boot_compile(table: RouteTable) -> Result[CompiledTable, BootError] {
+    ...
+}
+
+# The dispatch order is the contract: size before route, route before method.
+fn boot_dispatch(
+    table: CompiledTable,
+    request: Request
+) -> RouteResult {
+    ...
+}
+
+# A handler is a pure function of the request and the capabilities it was
+# handed. Registering it binds it to a HandlerId in the compiled table.
+fn boot_handle(
+    handler: HandlerId,
+    request: Request,
+    capabilities: Capabilities
+) -> Response {
+    ...
+}
+
+# Projections. Each derives from the same table the dispatcher runs, so the
+# document a client reads and the matcher a request meets cannot disagree.
+fn boot_openapi(table: RouteTable) -> Text {
+    ...
+}
+
+fn boot_client(table: RouteTable) -> Text {
+    ...
+}

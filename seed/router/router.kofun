@@ -1,0 +1,348 @@
+# kofun-boot executable seed: the static-dispatch router.
+#
+# This is the smallest artifact that is honestly kofun-boot rather than a
+# promise about it. One route table, fixed at build time; one dispatch whose
+# comparison count is independent of the request, so the same input can never
+# take two paths; a closed result sum whose every failure carries what was
+# observed; and handlers as pure functions that receive their one capability
+# as an argument, because there is nothing ambient for them to reach.
+#
+# The Stage 2 Core this file is checked and lowered by is deliberately small:
+# record fields are Int, an ADT constructor carries at most one Int, and there
+# are no loops. contracts/boot.kofun holds the canonical surface — Text paths,
+# List routes, multi-payload sums — and tests/boot/check.sh pins both files
+# against each other, the same way the language repository pins its clock and
+# tzdb surfaces.
+#
+# Encodings, all of them checked by the gate:
+#
+#   method   1 GET, 2 POST
+#   method bit for an Allow set: GET 1, POST 2
+#   route kind  1 Matched, 2 NotFound, 3 MethodNotAllowed, 4 PayloadTooLarge
+#
+# The table below is the compiled form of:
+#
+#   GET  /hello   -> handler 1
+#   POST /sum     -> handler 2
+#   GET  /bench   -> handler 3
+#   POST /bench   -> handler 4
+
+# ------------------------------------------------------------- constants
+
+fn method_get() -> Int {
+    return 1
+}
+
+fn method_post() -> Int {
+    return 2
+}
+
+fn method_bit(method: Int) -> Int {
+    if method == method_get() {
+        return 1
+    }
+    return 2
+}
+
+fn path_hello() -> Int {
+    return 101
+}
+
+fn path_sum() -> Int {
+    return 102
+}
+
+fn path_bench() -> Int {
+    return 103
+}
+
+fn body_limit() -> Int {
+    return 4096
+}
+
+fn kind_matched() -> Int {
+    return 1
+}
+
+fn kind_not_found() -> Int {
+    return 2
+}
+
+fn kind_method_not_allowed() -> Int {
+    return 3
+}
+
+fn kind_payload_too_large() -> Int {
+    return 4
+}
+
+# ---------------------------------------------------------------- values
+
+# A parsed request. Paths arrive as codes because the Core has no Text in
+# records; the canonical surface routes on Text segments.
+type Request = {
+    method: Int,
+    path: Int,
+    body_bytes: Int,
+}
+
+# One route slot: the compiled form of one contract line.
+type Route = {
+    method: Int,
+    path: Int,
+    handler: Int,
+}
+
+# The whole table. Fixed shape, because the table is data at build time —
+# there is no route registration at run time and no way to express it here.
+type RouteTable = {
+    r0_method: Int,
+    r0_path: Int,
+    r0_handler: Int,
+    r1_method: Int,
+    r1_path: Int,
+    r1_handler: Int,
+    r2_method: Int,
+    r2_path: Int,
+    r2_handler: Int,
+    r3_method: Int,
+    r3_path: Int,
+    r3_handler: Int,
+}
+
+# The closed dispatch result. Every failure carries what was observed:
+# MethodNotAllowed carries the Allow set as method bits, PayloadTooLarge
+# carries the limit that was exceeded. No case defaults.
+type RouteResult =
+    | Matched(handler: Int)
+    | NotFound(path: Int)
+    | MethodNotAllowed(allowed: Int)
+    | PayloadTooLarge(limit: Int)
+
+# The one capability a seed handler receives. There is no ambient clock to
+# reach instead — that is the language, and the framework keeps it that way.
+type Capabilities = {
+    now_seconds: Int,
+}
+
+# What a handler produces. Pure data out; the shell decides what to do with it.
+type Response = {
+    status: Int,
+    body_code: Int,
+}
+
+# ------------------------------------------------------- result accessors
+
+fn result_kind(result: RouteResult) -> Int {
+    let mut kind = 0
+    match result {
+        Matched(_) => { kind = kind_matched() },
+        NotFound(_) => { kind = kind_not_found() },
+        MethodNotAllowed(_) => { kind = kind_method_not_allowed() },
+        PayloadTooLarge(_) => { kind = kind_payload_too_large() },
+    }
+    return kind
+}
+
+fn result_payload(result: RouteResult) -> Int {
+    let mut payload = 0
+    match result {
+        Matched(handler) => { payload = handler },
+        NotFound(path) => { payload = path },
+        MethodNotAllowed(allowed) => { payload = allowed },
+        PayloadTooLarge(limit) => { payload = limit },
+    }
+    return payload
+}
+
+# ------------------------------------------------------------ the table
+
+fn boot_table() -> RouteTable {
+    let table: RouteTable = RouteTable(
+        r0_method: method_get(),
+        r0_path: path_hello(),
+        r0_handler: 1,
+        r1_method: method_post(),
+        r1_path: path_sum(),
+        r1_handler: 2,
+        r2_method: method_get(),
+        r2_path: path_bench(),
+        r2_handler: 3,
+        r3_method: method_post(),
+        r3_path: path_bench(),
+        r3_handler: 4
+    )
+    return table
+}
+
+# ------------------------------------------------------------- dispatch
+
+fn eq_flag(left: Int, right: Int) -> Int {
+    if left == right {
+        return 1
+    }
+    return 0
+}
+
+# How many slots share the request's path. Four comparisons, always.
+fn path_hits(table: RouteTable, request: Request) -> Int {
+    return eq_flag(table.r0_path, request.path)
+        + eq_flag(table.r1_path, request.path)
+        + eq_flag(table.r2_path, request.path)
+        + eq_flag(table.r3_path, request.path)
+}
+
+# The Allow set for the request's path, as method bits. A slot contributes its
+# method bit exactly when its path matches; a path with GET and POST slots
+# yields 3. Sums stay exact because each slot contributes one bit at most
+# and the two bits are distinct powers of two.
+fn allowed_set(table: RouteTable, request: Request) -> Int {
+    return eq_flag(table.r0_path, request.path) * method_bit(table.r0_method)
+        + eq_flag(table.r1_path, request.path) * method_bit(table.r1_method)
+        + eq_flag(table.r2_path, request.path) * method_bit(table.r2_method)
+        + eq_flag(table.r3_path, request.path) * method_bit(table.r3_method)
+}
+
+# The handler for the slot whose method AND path both match, or 0. At most one
+# slot can match because the table refuses duplicate (method, path) pairs at
+# build time — the gate proves the table holds that today.
+fn matched_handler(table: RouteTable, request: Request) -> Int {
+    let hit0: Int = eq_flag(table.r0_path, request.path)
+        * eq_flag(table.r0_method, request.method)
+    let hit1: Int = eq_flag(table.r1_path, request.path)
+        * eq_flag(table.r1_method, request.method)
+    let hit2: Int = eq_flag(table.r2_path, request.path)
+        * eq_flag(table.r2_method, request.method)
+    let hit3: Int = eq_flag(table.r3_path, request.path)
+        * eq_flag(table.r3_method, request.method)
+    return hit0 * table.r0_handler
+        + hit1 * table.r1_handler
+        + hit2 * table.r2_handler
+        + hit3 * table.r3_handler
+}
+
+# The dispatch order is the contract, and the gate reads it: size before
+# route, route before method. A body over the limit is refused before the
+# table is consulted, so an attacker cannot probe the route space with
+# oversized requests; an unknown path is NotFound regardless of method; a
+# known path with the wrong method names the methods that would have worked.
+fn dispatch(table: RouteTable, request: Request) -> RouteResult {
+    if request.body_bytes > body_limit() {
+        return PayloadTooLarge(body_limit())
+    }
+    let handler: Int = matched_handler(table, request)
+    if handler > 0 {
+        return Matched(handler)
+    }
+    if path_hits(table, request) == 0 {
+        return NotFound(request.path)
+    }
+    return MethodNotAllowed(allowed_set(table, request))
+}
+
+# ------------------------------------------------------------- handlers
+#
+# Pure functions. The only time a handler can observe is the time the shell
+# handed it, which is what makes every one of these replayable.
+
+fn handle_hello(request: Request, capabilities: Capabilities) -> Response {
+    let response: Response = Response(
+        status: 200,
+        body_code: request.path * 1000 + capabilities.now_seconds
+    )
+    return response
+}
+
+fn handle_sum(request: Request, capabilities: Capabilities) -> Response {
+    let response: Response = Response(
+        status: 200,
+        body_code: request.body_bytes + capabilities.now_seconds
+    )
+    return response
+}
+
+# ---------------------------------------------------------------- shell
+
+fn request_at(method: Int, path: Int, body_bytes: Int) -> Request {
+    let request: Request = Request(
+        method: method,
+        path: path,
+        body_bytes: body_bytes
+    )
+    return request
+}
+
+fn emit_dispatch(table: RouteTable, request: Request) -> Int {
+    let result: RouteResult = dispatch(table, request)
+    print(request.method)
+    print(request.path)
+    print(result_kind(result))
+    print(result_payload(result))
+    return 0
+}
+
+fn main() -> Int {
+    let table: RouteTable = boot_table()
+
+    # --- the table itself, so the golden pins the compiled form
+    print(table.r0_method)
+    print(table.r0_path)
+    print(table.r0_handler)
+    print(table.r1_method)
+    print(table.r1_path)
+    print(table.r1_handler)
+    print(table.r2_method)
+    print(table.r2_path)
+    print(table.r2_handler)
+    print(table.r3_method)
+    print(table.r3_path)
+    print(table.r3_handler)
+
+    # --- every dispatch outcome, one per closed constructor
+    let hello: Request = request_at(method_get(), path_hello(), 0)
+    emit_dispatch(table, hello)
+    let sum: Request = request_at(method_post(), path_sum(), 64)
+    emit_dispatch(table, sum)
+    let wrong_method: Request = request_at(method_get(), path_sum(), 0)
+    emit_dispatch(table, wrong_method)
+    let both_methods: Request = request_at(method_post(), path_bench(), 0)
+    emit_dispatch(table, both_methods)
+    let missing: Request = request_at(method_get(), 999, 0)
+    emit_dispatch(table, missing)
+
+    # --- size is checked before the route: an oversized body to a known
+    #     route and to an unknown one report the same thing
+    let oversized_known: Request = request_at(
+        method_get(),
+        path_hello(),
+        4097
+    )
+    emit_dispatch(table, oversized_known)
+    let oversized_unknown: Request = request_at(method_get(), 999, 4097)
+    emit_dispatch(table, oversized_unknown)
+
+    # --- the limit itself is inside the limit: half-open at the top
+    let at_limit: Request = request_at(method_get(), path_hello(), 4096)
+    emit_dispatch(table, at_limit)
+
+    # --- a wrong method on a path that allows both methods still names both
+    #     (bench only has GET and POST, so its Allow set is 3; a method code
+    #     outside the table proves the set does not depend on the request)
+    let odd_method: Request = request_at(9, path_bench(), 0)
+    emit_dispatch(table, odd_method)
+
+    # --- handlers are pure: the same request and the same capability record
+    #     produce the same response, and time is the injected field
+    let clock: Capabilities = Capabilities(now_seconds: 42)
+    let hello_response: Response = handle_hello(hello, clock)
+    print(hello_response.status)
+    print(hello_response.body_code)
+    let sum_response: Response = handle_sum(sum, clock)
+    print(sum_response.status)
+    print(sum_response.body_code)
+    let later: Capabilities = Capabilities(now_seconds: 43)
+    let hello_later: Response = handle_hello(hello, later)
+    print(hello_later.body_code)
+
+    return 0
+}
