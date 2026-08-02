@@ -33,6 +33,13 @@ jobs:
           submodules: true
       - run: sh tests/boot/check.sh
 
+  research-pack:
+    name: Deterministic research ZIP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: sh tests/research/check.sh
+
   serve:
     name: Integration — a real server on a real socket
     runs-on: ubuntu-latest

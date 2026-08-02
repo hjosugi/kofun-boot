@@ -30,6 +30,7 @@ sh scripts/dev.sh          # 22 unit tests, a build, and a golden check — abou
 | `sh scripts/dev.sh --watch` | re-run on every save |
 | `sh scripts/dev.sh --serve` | a real server on a real socket |
 | `sh scripts/dev.sh --openapi` | the document the route table projects |
+| `sh scripts/dev.sh --research` | deterministic framework-research ZIP + SHA-256 |
 | `sh scripts/dev.sh --check` | exactly what CI runs, in CI's order |
 
 The last row is the point: a green terminal and a green pipeline are the same
@@ -126,7 +127,40 @@ number quoted; hand-editing the OpenAPI document fails with the diff.
 | `tests/integration/serve.sh` | a real server on a real socket |
 | `docs/adr/` | the numbered decision log — why, and what it cost |
 | `docs/DESIGN.md`, `docs/ROADMAP.md` | the architecture; the lanes and what each is blocked on |
+| `docs/BACKLOG.md` | the epic decomposition, issue shape, and labels |
+| `docs/research/` | the source-linked, dated surveys behind the decisions |
+| `docs/architecture/` | the resulting effect, update-loop, and domain-model decisions |
 | `vendor/kofun` | the pinned language checkout |
+
+## The three decisions worth arguing with
+
+The research dossiers in [`docs/research/`](docs/research/) produced three
+positions that shape everything else. Each links to the evidence.
+
+**Effects are inert data, not a monad.**
+[`docs/architecture/EFFECTS.md`](docs/architecture/EFFECTS.md) — the core
+returns a `Cmd` describing what should happen; the shell interprets it holding
+the capabilities. This needs a closed sum and a function, which is all Kofun
+has today, and it is *why Elm is understandable* — the monad was never the
+clear part. A recorded run then **is** the `Cmd`/`Msg` sequence, so replay
+needs no instrumentation.
+
+**One update loop, three shells.**
+[`docs/architecture/TEA.md`](docs/architecture/TEA.md) — `init`, `update`,
+`view`, `subscriptions`, all pure, interpreted by a server shell, a desktop
+shell, or a server-driven shell. That the same core runs under all of them is
+a gate, not a slogan.
+
+**The view is an ADT, which is the only reason "replace the webview" is
+schedulable.**
+[`docs/research/RENDER_BACKENDS.md`](docs/research/RENDER_BACKENDS.md) — Tauri
+cannot swap its renderer cheaply because its contract *is* the DOM, so a
+replacement must reimplement the web platform; that is why the leading attempt
+is still pre-alpha. If the view is a vocabulary we chose, a renderer is an
+interpreter, and native becomes a second backend rather than a rewrite. The
+same dossier records the finding that governs the desktop lane: **IME and
+accessibility are gates, not features**. No performance number is recorded
+until both pass under a gate.
 
 ## What we refuse
 

@@ -11,6 +11,7 @@ set -eu
 #   scripts/dev.sh --serve    the integration test: a real server, real sockets
 #   scripts/dev.sh --check    everything CI runs, in CI's order
 #   scripts/dev.sh --openapi  print the document the route table projects
+#   scripts/dev.sh --research build the deterministic research ZIP
 #
 # The design rule is that the loop a developer runs and the loop CI runs are
 # the same commands, so a green terminal and a green pipeline mean the same
@@ -74,6 +75,9 @@ case "${1:-}" in
     --openapi)
         sh "$ROOT/scripts/openapi.sh"
         ;;
+    --research)
+        sh "$ROOT/scripts/build-research-pack.sh" "$ROOT/dist"
+        ;;
     --serve)
         banner "serve"
         sh "$ROOT/tests/integration/serve.sh"
@@ -83,6 +87,7 @@ case "${1:-}" in
         # pipeline's green cannot come to mean different things.
         run_tests
         sh "$ROOT/tests/boot/check.sh"
+        sh "$ROOT/tests/research/check.sh"
         sh "$ROOT/tests/integration/serve.sh"
         ;;
     --watch)
