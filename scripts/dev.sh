@@ -11,6 +11,7 @@ set -eu
 #   scripts/dev.sh --serve    the integration test: a real server, real sockets
 #   scripts/dev.sh --check    everything CI runs, in CI's order
 #   scripts/dev.sh --openapi  print the document the route table projects
+#   scripts/dev.sh --client   print the typed client the route table projects
 #
 # The design rule is that the loop a developer runs and the loop CI runs are
 # the same commands, so a green terminal and a green pipeline mean the same
@@ -73,6 +74,9 @@ case "${1:-}" in
         ;;
     --openapi)
         sh "$ROOT/scripts/openapi.sh"
+        ;;
+    --client)
+        sh "$ROOT/scripts/client-ts.sh"
         ;;
     --serve)
         banner "serve"

@@ -31,6 +31,14 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: true
+      # The gate type-checks the generated client when tsc is present and says
+      # SKIP when it is not. Installing it here means CI never takes the skip:
+      # a gate that quietly degrades on the machine that matters is a gate
+      # that is not running.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - run: npm install -g typescript@5.9.3
       - run: sh tests/boot/check.sh
 
   serve:

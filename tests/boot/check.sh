@@ -274,6 +274,54 @@ test "$table_rows" -eq "$document_ops" ||
 
 printf 'boot: the OpenAPI document is a projection of the table the router ran: PASS\n'
 
+# ------------------------------------------------ the TypeScript client
+#
+# Same projection path, and one claim the document cannot make: a wrong path
+# or a wrong method must be a compile error at the call site. Both directions
+# are checked, because a client that rejected everything would also make the
+# negative fixtures fail and would be worthless.
+
+recorded_client="$ROOT/contracts/client.ts"
+test -f "$recorded_client" || fail 'the generated client is missing'
+
+sh "$ROOT/scripts/client-ts.sh" "$WORK/router" >"$WORK/client.ts" ||
+    fail 'the client projection failed'
+cmp "$recorded_client" "$WORK/client.ts" ||
+    fail "the generated client no longer matches the table the router runs:
+$(diff "$recorded_client" "$WORK/client.ts" | head -12)"
+
+client_paths=$(grep -cE '^  \| "/' "$recorded_client")
+table_rows=$(sed -n '1,12p' "$expected" | paste - - - | wc -l)
+test "$client_paths" -eq "$table_rows" ||
+    fail "the table has $table_rows routes and the client exposes $client_paths"
+
+if command -v tsc >/dev/null 2>&1; then
+    mkdir -p "$WORK/ts"
+    cp "$recorded_client" "$WORK/ts/client.ts"
+    cp "$ROOT/tests/client/"*.ts "$WORK/ts/"
+    TSC_FLAGS='--noEmit --strict --target es2022 --lib es2022,dom --moduleResolution bundler --module esnext'
+
+    # shellcheck disable=SC2086
+    (cd "$WORK/ts" && tsc $TSC_FLAGS accepts.ts) >"$WORK/tsc.accept" 2>&1 ||
+        fail "a call the table allows did not type-check:
+$(sed 's/^/    /' "$WORK/tsc.accept")"
+
+    for fixture in rejects-wrong-method rejects-unknown-path; do
+        # shellcheck disable=SC2086
+        if (cd "$WORK/ts" && tsc $TSC_FLAGS "$fixture.ts") \
+            >"$WORK/tsc.$fixture" 2>&1
+        then
+            fail "$fixture.ts type-checked; the client accepts a call the table refuses"
+        fi
+        grep -q 'is not assignable to parameter of type' "$WORK/tsc.$fixture" ||
+            fail "$fixture.ts failed for the wrong reason:
+$(sed 's/^/    /' "$WORK/tsc.$fixture")"
+    done
+    printf 'boot: a wrong path or method is a compile error at the call site: PASS\n'
+else
+    printf 'boot: SKIP client type-check (tsc unavailable); projection still gated\n'
+fi
+
 printf 'boot: canonical contract pinned at its boundary: PASS\n'
 printf 'boot: fixed-rank dispatch, every closed outcome read by name: PASS\n'
 printf 'boot: handlers are pure and time is an injected capability: PASS\n'
