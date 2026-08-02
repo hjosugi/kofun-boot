@@ -30,6 +30,7 @@ sh scripts/dev.sh          # 22 unit tests, a build, and a golden check — abou
 | `sh scripts/dev.sh --watch` | re-run on every save |
 | `sh scripts/dev.sh --serve` | a real server on a real socket |
 | `sh scripts/dev.sh --openapi` | the document the route table projects |
+| `sh scripts/dev.sh --client` | the typed client the route table projects |
 | `sh scripts/dev.sh --check` | exactly what CI runs, in CI's order |
 
 The last row is the point: a green terminal and a green pipeline are the same
@@ -73,11 +74,22 @@ in the value, so ids are deterministic with **no clock and no entropy**.
 
 ### The projections — one declaration, many artifacts
 
-`scripts/openapi.sh` generates the OpenAPI document from **the twelve lines the
-router itself printed**, which the gate pins as the compiled table. A document
+`scripts/openapi.sh` and `scripts/client-ts.sh` both read **the twelve lines the
+router itself printed**, which the gate pins as the compiled table. Artifacts
 made from those bytes cannot describe a route the dispatcher does not serve.
-Editing it by hand fails; a projection that silently drops a route fails on the
-count.
+
+The typed client turns that into a compile error at the call site:
+
+```ts
+await client.get("/hello");   // fine
+await client.get("/sum");     // TS2345: "/sum" is not assignable to GetPath
+await client.get("/nope");    // TS2345: "/nope" is not assignable to GetPath
+```
+
+Editing either artifact by hand fails; a projection that drops a route fails on
+the count; and widening a path type to `string` — which leaves the generated
+file reading entirely correct — fails because a call the table forbids then
+compiles.
 
 ## Testing, which is most of the reason to pick a framework
 
@@ -105,7 +117,7 @@ number quoted; hand-editing the OpenAPI document fails with the diff.
 
 | pillar | inherited from | the measurable bar |
 |---|---|---|
-| Contract-first APIs | servant, FastAPI, Elysia | routes, validation, OpenAPI, and the typed client derive from **one** declaration; drift is a build failure — **holds for the document today** |
+| Contract-first APIs | servant, FastAPI, Elysia | routes, validation, OpenAPI, and the typed client derive from **one** declaration; drift is a build failure — **holds for the document and the TypeScript client today** |
 | Capabilities, not containers | Spring DI, inverted | no container and no reflection; the core **may not construct** a capability, enforced by a gate that prints the offending line |
 | Functional core, imperative shell | FCIS, functional DDD | enforced by construction — **holds today** |
 | Deterministic replay | Kofun's gate culture | identical bytes on both backends, twice, under a hostile `TZ`, locale, and `env -i` — **holds today** |
@@ -121,7 +133,8 @@ number quoted; hand-editing the OpenAPI document fails with the diff.
 | `contracts/` | canonical surfaces ahead of the compiler, pinned by gates; the generated OpenAPI document |
 | `seed/router/` | the dispatcher: core, shell, unit suite, golden |
 | `seed/mock/` | the REST resource: core, unit suite |
-| `scripts/` | `dev.sh`, `build-seed.sh`, `openapi.sh` |
+| `scripts/` | `dev.sh`, `build-seed.sh`, `openapi.sh`, `client-ts.sh` |
+| `tests/client/` | one call that must compile, two that must not |
 | `tests/boot/check.sh` | the gate: boundary, contract, dispatch decisions, projection, determinism |
 | `tests/integration/serve.sh` | a real server on a real socket |
 | `docs/adr/` | the numbered decision log — why, and what it cost |
