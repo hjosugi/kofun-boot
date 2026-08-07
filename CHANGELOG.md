@@ -50,7 +50,7 @@ diff UI.
   does not trust, but no baseline has been recorded.
 - Desktop lighter than Tauri — L9; blocked on the language's wasm32 activation
   lanes, and gated behind IME and accessibility conformance before any number
-  is recorded ([#29](https://github.com/hjosugi/kofun-boot/issues/29)).
+  is recorded ([#29](https://github.com/kofun-lang/kofun-boot/issues/29)).
 
 ### Known boundaries
 
@@ -102,14 +102,14 @@ runtime, scheduler, live network interpreter, or unscoped spawn.
   does not trust, but no baseline has been recorded.
 - Desktop lighter than Tauri — L9; blocked on the language's wasm32 activation
   lanes, and gated behind IME and accessibility conformance before any number
-  is recorded ([#29](https://github.com/hjosugi/kofun-boot/issues/29)).
+  is recorded ([#29](https://github.com/kofun-lang/kofun-boot/issues/29)).
 
 ### Known boundaries
 
 - The rich contract uses `List`, `Bytes`, and multi-payload constructors ahead
   of the compiler; the executable projection uses fixed-rank integer values.
 - No live interpreter, TEA loop, scheduler, trace serialisation, or scoped
-  spawn is claimed by this release. Trace v1 remains [#32](https://github.com/hjosugi/kofun-boot/issues/32).
+  spawn is claimed by this release. Trace v1 remains [#32](https://github.com/kofun-lang/kofun-boot/issues/32).
 
 ## [0.2.0] - 2026-08-02
 
@@ -166,7 +166,7 @@ and the router's canonical contract moved with its owner.
   does not trust, but no baseline has been recorded.
 - Desktop lighter than Tauri — L9; blocked on the language's wasm32 activation
   lanes, and gated behind IME and accessibility conformance before any number
-  is recorded ([#29](https://github.com/hjosugi/kofun-boot/issues/29)).
+  is recorded ([#29](https://github.com/kofun-lang/kofun-boot/issues/29)).
 
 ### Known boundaries
 
@@ -240,23 +240,23 @@ is blocked on the lane named beside it.
   does not trust, but no baseline has been recorded.
 - Desktop lighter than Tauri — L9; blocked on the language's wasm32 activation
   lanes, and gated behind IME and accessibility conformance before any number
-  is recorded ([#29](https://github.com/hjosugi/kofun-boot/issues/29)).
+  is recorded ([#29](https://github.com/kofun-lang/kofun-boot/issues/29)).
 
 ### Known boundaries
 
 - Structured concurrency is blocked on the language RFC and ships nothing.
 - The `Cmd`/`Sub` effect surface is a decision
   ([`docs/architecture/EFFECTS.md`](docs/architecture/EFFECTS.md)) and a filed
-  contract ([#31](https://github.com/hjosugi/kofun-boot/issues/31)), not yet
+  contract ([#31](https://github.com/kofun-lang/kofun-boot/issues/31)), not yet
   executable code.
 - Whether the view is a shared ADT or platform-specific is an open decision
-  ([#28](https://github.com/hjosugi/kofun-boot/issues/28)) and determines the
+  ([#28](https://github.com/kofun-lang/kofun-boot/issues/28)) and determines the
   shape of the desktop lane.
 - `0.x` makes no API stability promise. Minors may break the contract surface;
   this file will say so when they do.
 
-[Unreleased]: https://github.com/hjosugi/kofun-boot/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/hjosugi/kofun-boot/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/hjosugi/kofun-boot/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/hjosugi/kofun-boot/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/hjosugi/kofun-boot/releases/tag/v0.1.0
+[Unreleased]: https://github.com/kofun-lang/kofun-boot/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/kofun-lang/kofun-boot/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/kofun-lang/kofun-boot/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/kofun-lang/kofun-boot/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/kofun-lang/kofun-boot/releases/tag/v0.1.0

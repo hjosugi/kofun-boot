@@ -17,7 +17,7 @@ not ready; an issue whose change cannot be reviewed in one sitting needs a
 split, and producing that split is itself the refinement work.
 
 This is the discipline the language repository documents in
-[`docs/ISSUE_READINESS.md`](https://github.com/hjosugi/kofun/blob/main/docs/ISSUE_READINESS.md),
+[`docs/ISSUE_READINESS.md`](https://github.com/kofun-lang/kofun/blob/main/docs/ISSUE_READINESS.md),
 and kofun-boot adopts it wholesale rather than inventing a second one.
 
 ## Issue shape
@@ -88,7 +88,7 @@ dossiers produced, and `docs/ROADMAP.md` carries them in its lane table.
 
 ### The R-series is orthogonal
 
-[R0 #15](https://github.com/hjosugi/kofun-boot/issues/15) and its children
+[R0 #15](https://github.com/kofun-lang/kofun-boot/issues/15) and its children
 R1–R10 are a **research programme**, not a lane. Each R issue produces a
 decision that lands in one or more lanes, and the lane's epics carry the
 implementation. An R issue closes when its decision is recorded and its
@@ -126,5 +126,5 @@ The rule:
 | `needs-detail` | outcome known, scope or validation needs refinement |
 | `needs-decision` | blocked on an explicit design or product decision, with a named owner |
 | `blocked` | blocked on something open, named by number in `## Dependencies` |
-| `blocked:language` | blocked on a `hjosugi/kofun` capability, tracked by that issue number |
+| `blocked:language` | blocked on a `kofun-lang/kofun` capability, tracked by that issue number |
 | `size:S` / `size:M` / `size:L` | one sitting / one day / needs a split unless genuinely one change |

@@ -7,9 +7,9 @@ them, and which of those designs survives in a language with no higher-kinded
 types, no type classes, and a deliberately small executable core?**
 
 That last clause is the binding constraint. Kofun's
-[type system document](https://github.com/hjosugi/kofun/blob/main/docs/TYPE_SYSTEM.md)
+[type system document](https://github.com/kofun-lang/kofun/blob/main/docs/TYPE_SYSTEM.md)
 names ADTs, traits, effects and row polymorphism as *targets*; the
-[implemented-status matrix](https://github.com/hjosugi/kofun/blob/main/docs/MVP_IMPLEMENTED.md)
+[implemented-status matrix](https://github.com/kofun-lang/kofun/blob/main/docs/MVP_IMPLEMENTED.md)
 records that the general parser and type checker are open, that enum matching
 is a bounded slice with one `Int` payload, and that records lower `Int`/`Bool`
 fields. A design that needs `Monad m => m a` is not a design for this

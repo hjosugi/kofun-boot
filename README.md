@@ -1,7 +1,7 @@
 # kofun-boot
 
 Batteries-included application framework for the
-[Kofun](https://github.com/hjosugi/kofun) language.
+[Kofun](https://github.com/kofun-lang/kofun) language.
 
 The ambition is Spring Boot's: the de-facto way to build a production
 application. The discipline is Kofun's: every claim is backed by a gate, every
@@ -18,7 +18,7 @@ Everything below follows from that sentence.
 ## Try it
 
 ```sh
-git clone --recurse-submodules https://github.com/hjosugi/kofun-boot
+git clone --recurse-submodules https://github.com/kofun-lang/kofun-boot
 cd kofun-boot
 sh scripts/dev.sh                      # 34 unit tests, a build, a golden check — about a second
 sh scripts/new.sh ../my-app --name my-app   # a project that already has the boundary

@@ -25,7 +25,7 @@ Because it is not expressible, and because it is not the part that makes Elm
 understandable.
 
 Not expressible: Kofun's
-[implemented-status matrix](https://github.com/hjosugi/kofun/blob/main/docs/MVP_IMPLEMENTED.md)
+[implemented-status matrix](https://github.com/kofun-lang/kofun/blob/main/docs/MVP_IMPLEMENTED.md)
 records the general parser and type checker as open, enum matching as a
 bounded slice carrying one `Int` payload, and records lowering `Int`/`Bool`
 fields. `Monad m => m a` needs higher-kinded types and type classes; neither

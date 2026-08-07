@@ -328,7 +328,7 @@ chmod +x "$target/tests/check.sh"
 cat >"$target/README.md" <<README
 # $name
 
-Built with [kofun-boot](https://github.com/hjosugi/kofun-boot).
+Built with [kofun-boot](https://github.com/kofun-lang/kofun-boot).
 
 \`\`\`sh
 sh tests/check.sh    # the boundary, the unit suite, and the recorded output
