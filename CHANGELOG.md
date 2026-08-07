@@ -13,6 +13,25 @@ the `Unmeasured at this release` section added as a local requirement.
 
 Nothing yet.
 
+## [0.4.1] - 2026-08-07
+
+The repository moved to the `kofun-lang` organization. Documentation links now
+resolve there; nothing in the framework changed.
+
+### Fixed
+
+- **Links follow the move** — GitHub redirects repository URLs after a transfer
+  but not GitHub Pages, so documentation links had to name the organization
+  directly.
+
+### Unmeasured at this release
+
+- Speed — L5; the benchmark harness exists and refuses to produce a number it
+  does not trust, but no baseline has been recorded.
+- Desktop lighter than Tauri — L9; blocked on the language's wasm32 activation
+  lanes, and gated behind IME and accessibility conformance before any number
+  is recorded ([#29](https://github.com/kofun-lang/kofun-boot/issues/29)).
+
 ## [0.4.0] - 2026-08-02
 
 Effect trace v1 now records the program's own `Cmd`/`Msg` values and replays
@@ -256,6 +275,7 @@ is blocked on the lane named beside it.
   this file will say so when they do.
 
 [Unreleased]: https://github.com/kofun-lang/kofun-boot/compare/v0.4.0...HEAD
+[0.4.1]: https://github.com/kofun-lang/kofun-boot/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/kofun-lang/kofun-boot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kofun-lang/kofun-boot/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kofun-lang/kofun-boot/compare/v0.1.0...v0.2.0
