@@ -11,7 +11,61 @@ the `Unmeasured at this release` section added as a local requirement.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **The mock resource's status mapping**
+  ([#34](https://github.com/hjosugi/kofun-boot/issues/34), partial) — every
+  `MockOutcome` maps to exactly one HTTP status, as a match over the closed sum
+  rather than a table of codes. Adding a constructor without deciding its
+  status does not compile: `error[E2S25]: non-exhaustive enum MockOutcome
+  match`. **No outcome maps into 5xx**, and the gate enforces it — a domain
+  rule declining a request is not the server failing.
+- **[ADR 7](docs/adr/0007-a-full-resource-is-a-conflict-not-a-storage-failure.md)** —
+  `Full` is **409, not 507**: the caller can free a slot and retry, so it is a
+  conflict with the resource's current state, and 507 is 5xx, which would page
+  an operator for a server behaving exactly as specified. `Deleted` is **204**,
+  and the ADR records that this is the one seam where the domain answer carries
+  something the protocol drops — the id survives in the trace, where it proves
+  a freed id is never reissued.
+- **A seed digest in the session trace, verified before any step**
+  (`scripts/seed-digest.sh`) — the header has always *named* the seed, but a
+  name is not a pin: a seed can be edited without being renamed, and the trace
+  then diverged at step 1 with a confusing row mismatch instead of saying that
+  this is a trace of a different resource. The digest is compared first and a
+  mismatch is refused by name.
+
+### Changed
+
+- **The session trace is `kofun-boot.trace/v2`** — a ninth `status` column, so
+  the mapping is replayed and compared byte-for-byte on every run rather than
+  asserted once somewhere that can drift from the wire. The session gained two
+  steps so it fills the resource and reaches `Full`; without them 409, the one
+  status this module actually had to decide, was mapped but never exercised.
+  All seven outcome constructors now appear in the trace, and the gate requires
+  that.
+- **The freed-id check selects by outcome rather than by operation.** It read
+  the last *create*, which is now the one refused as `Full`, whose payload is
+  the capacity — it would have compared an id against a capacity and passed
+  without checking anything.
+
+### Gates
+
+- 39/39 module-owned tests pass across three suites.
+- Every outcome constructor reaches the trace, maps to exactly one status, and
+  none is 5xx — read from the trace the replay proved the binary emits.
+- The status mapping must have one arm per outcome and no catch-all; a
+  catch-all would give a new constructor a status nobody decided.
+- Two break tests: mapping `Full` to 507 is caught by the server-error rule,
+  and removing an arm entirely is refused by the compiler as non-exhaustive.
+
+### Known boundaries
+
+- **Binding these statuses to real HTTP responses waits on
+  [#2](https://github.com/hjosugi/kofun-boot/issues/2)**, which owns handler
+  registration in the serve lane. The mapping is decided and gated ahead of it
+  so that work is wiring rather than deciding. `boot mock`'s CLI surface —
+  `--seed`, `--record`, `--replay` as flags — likewise waits on
+  [#8](https://github.com/hjosugi/kofun-boot/issues/8).
 
 ## [0.4.0] - 2026-08-02
 
